@@ -3,7 +3,7 @@ import { CalcError, calculate, compileFunction } from "../lib/calc";
 import { mulberry32, randomSeed } from "../lib/rng";
 import { type Door, decide, flipCoins, newMontyGame, pickDoor, simulateMonty } from "../lib/simulations";
 import { type DistributionFamily, type DistributionParams, makeDistribution, probabilityBetween } from "../lib/stats";
-import { EMOTIONS, type Emotion, GESTURES, type Gesture } from "../shared/protocol";
+import type { Emotion, Gesture } from "../shared/protocol";
 import { stripEmoji } from "../shared/text";
 import type { BoardStore, LineKind, NotebookMark } from "./store";
 
@@ -21,6 +21,8 @@ export interface ToolContext {
   locate?(imageBase64: string, target: string): Promise<[number, number, number, number] | null>;
   /** Called for every board change so Mochi can glance and point at it. */
   onBoardChange(): void;
+  /** Clock in ms, injectable for tests. */
+  now?(): number;
 }
 
 type Args = Record<string, unknown>;
@@ -34,6 +36,9 @@ const clampInt = (v: unknown, lo: number, hi: number, fallback: number) =>
 
 let rng = mulberry32(randomSeed());
 let nextMarkId = 1;
+let montyPickedAt = 0;
+/** The student needs a moment to answer "stay or switch" before the game can finish. */
+const MONTY_DECIDE_MS = 3000;
 
 const handlers: Record<string, (args: Args, ctx: ToolContext, signal: AbortSignal) => Promise<Result> | Result> = {
   write_on_board(args, { board, onBoardChange }) {
@@ -88,7 +93,8 @@ const handlers: Record<string, (args: Args, ctx: ToolContext, signal: AbortSigna
     };
   },
 
-  monty_hall(args, { board, onBoardChange }) {
+  monty_hall(args, ctx) {
+    const { board, onBoardChange } = ctx;
     const action = str(args.action);
     const current = board.latest("monty");
     if (action === "simulate") {
@@ -109,6 +115,9 @@ const handlers: Record<string, (args: Args, ctx: ToolContext, signal: AbortSigna
     }
     if (action === "start" || !current?.game) {
       if (action !== "start") throw new Error('No game running. Call monty_hall with action "start" first.');
+      if (current?.game?.phase === "choose") {
+        return { response: { doors: 3, next: "A game is already waiting. Ask the student to pick door 1, 2 or 3." } };
+      }
       const game = newMontyGame(rng);
       if (current) board.update(current.id, "monty", { game, sim: null });
       else board.add({ kind: "monty", game, sim: null });
@@ -119,20 +128,31 @@ const handlers: Record<string, (args: Args, ctx: ToolContext, signal: AbortSigna
       const door = clampInt(args.door, 1, 3, 1) as Door;
       const game = pickDoor(current.game, door, rng);
       board.update(current.id, "monty", { game });
+      montyPickedAt = (ctx.now ?? Date.now)();
       if (game.phase !== "decide") throw new Error("unexpected state");
       return {
         response: {
           picked: door,
           host_opened: game.opened,
           behind_opened_door: "goat",
-          next: `Ask whether they want to stay with door ${door} or switch to door ${6 - door - game.opened}.`,
+          next: `Stop here. Ask whether they want to stay with door ${door} or switch to door ${6 - door - game.opened}, and wait for their answer before calling switch or stay.`,
         },
       };
     }
     if (action === "switch" || action === "stay") {
+      if (current.game.phase === "done") {
+        const g = current.game;
+        throw new Error(
+          `This game is over: the student ${g.switched ? "switched" : "stayed"} and ${g.won ? "won the car" : "got a goat"}. Call start for a new game.`,
+        );
+      }
+      if ((ctx.now ?? Date.now)() - montyPickedAt < MONTY_DECIDE_MS) {
+        throw new Error("Wait for the student to say stay or switch before finishing the game.");
+      }
       const game = decide(current.game, action === "switch");
       board.update(current.id, "monty", { game });
       if (game.phase !== "done") throw new Error("unexpected state");
+      ctx.react(game.won ? "excited" : "oops", game.won ? "cheer" : "shrug");
       return {
         response: { final_door: game.final, car_was_behind: game.car, switched: game.switched, won_the_car: game.won },
       };
@@ -224,17 +244,6 @@ const handlers: Record<string, (args: Args, ctx: ToolContext, signal: AbortSigna
         .catch(() => {});
     }
     return { response: { marked: true } };
-  },
-
-  react(args, ctx) {
-    const emotion = (EMOTIONS as readonly string[]).includes(str(args.emotion))
-      ? (str(args.emotion) as Emotion)
-      : "happy";
-    const gesture = (GESTURES as readonly string[]).includes(str(args.gesture))
-      ? (str(args.gesture) as Gesture)
-      : "none";
-    ctx.react(emotion, gesture);
-    return { response: { ok: true } };
   },
 };
 

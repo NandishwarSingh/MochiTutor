@@ -6,6 +6,7 @@ import { stripEmoji } from "../src/shared/text";
 let board: BoardStore;
 let reactions: string[];
 let ctx: ToolContext;
+let clock = 0;
 const signal = new AbortController().signal;
 
 beforeEach(() => {
@@ -18,7 +19,9 @@ beforeEach(() => {
     react: (e, g) => reactions.push(`${e}/${g}`),
     onBoardChange: () => {},
     locate: async () => [210, 50, 260, 740],
+    now: () => clock,
   };
+  clock = 0;
 });
 
 const call = async (name: string, args: Record<string, unknown> = {}) => {
@@ -67,10 +70,18 @@ describe("board tools", () => {
   test("monty hall full game", async () => {
     expect((await call("monty_hall", { action: "pick", door: 1 })).response.error).toContain("start");
     await call("monty_hall", { action: "start" });
+    // A second start while waiting for a pick keeps the same game.
+    const car = board.latest("monty")?.game?.car;
+    expect((await call("monty_hall", { action: "start" })).response.next).toContain("already waiting");
+    expect(board.latest("monty")?.game?.car).toBe(car);
     const pick = (await call("monty_hall", { action: "pick", door: 2 })).response;
     expect(pick.picked).toBe(2);
     expect([1, 3]).toContain(pick.host_opened as number);
+    // The model may not answer for the student.
+    expect((await call("monty_hall", { action: "stay" })).response.error).toContain("Wait for the student");
+    clock += 5000;
     const end = (await call("monty_hall", { action: "switch" })).response;
+    expect((await call("monty_hall", { action: "switch" })).response.error).toContain("game is over");
     expect(end.switched).toBe(true);
     expect(end.final_door).not.toBe(2);
     expect(end.final_door).not.toBe(pick.host_opened);
@@ -124,9 +135,12 @@ describe("board tools", () => {
     expect((await call("look_at_notebook")).response.error).toContain("No camera");
   });
 
-  test("react validates its enums", async () => {
-    await call("react", { emotion: "evil", gesture: "cheer" });
-    expect(reactions).toEqual(["happy/cheer"]);
+  test("monty results move Mochi without a tool call", async () => {
+    await call("monty_hall", { action: "start" });
+    await call("monty_hall", { action: "pick", door: 1 });
+    clock += 5000;
+    const end = (await call("monty_hall", { action: "stay" })).response;
+    expect(reactions).toEqual([end.won_the_car ? "excited/cheer" : "oops/shrug"]);
   });
 });
 

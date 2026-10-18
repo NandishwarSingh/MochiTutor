@@ -8,6 +8,7 @@ import type { BoardMessage, Emotion, Gesture, MarkerLayout, Visemes } from "../s
 import { StageSocket } from "../shared/stage-socket";
 import { stripEmoji } from "../shared/text";
 import { Camera } from "./camera";
+import { MoodTracker } from "./mood";
 import { BoardStore } from "./store";
 import { type Photo, runTool } from "./tools";
 
@@ -72,6 +73,7 @@ export class Lesson {
   private userTalkingSince = 0;
   private userQuietSince = 0;
   private pending = new Map<string, AbortController>();
+  private readonly mood = new MoodTracker((emotion, gesture) => this.react(emotion, gesture));
 
   constructor(readonly roomCode: string) {
     this.socket = new StageSocket(roomCode, "board", (m) => {
@@ -216,6 +218,7 @@ export class Lesson {
   private onMochiText(text: string): void {
     clearTimeout(this.captionTimer);
     const clean = stripEmoji(text);
+    this.mood.push(clean);
     if (!this.turnOpen) {
       this.turnOpen = true;
       this.set({ mochiSays: clean.trimStart() });
@@ -226,6 +229,7 @@ export class Lesson {
 
   private closeTurn(): void {
     this.turnOpen = false;
+    this.mood.reset();
     clearTimeout(this.captionTimer);
     this.captionTimer = setTimeout(() => this.set({ mochiSays: "", youSaid: "" }), 6000);
     this.set({ youSaid: "" });
