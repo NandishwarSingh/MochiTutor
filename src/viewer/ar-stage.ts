@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { MochiAvatar } from "../avatar/mochi";
-import { addLights, ensureShadow } from "../avatar/stage";
+import { addLights, createRenderer, ensureShadow, fitRenderer, releaseRenderer } from "../avatar/stage";
 import { PoseFilter } from "./filter";
 import { type Pose, poseToGl, projectionFromIntrinsics } from "./pose";
 
@@ -46,11 +46,14 @@ export class ArStage {
   private lastSeen = 0;
   private lastPoseAt = 0;
   private filtered: { p: THREE.Vector3; q: THREE.Quaternion } | null = null;
+  private disposed = false;
   onFrame: ((dt: number) => void) | null = null;
+  /** The browser took the GPU context away, usually because the phone ran out of graphics memory. */
+  onContextLost: (() => void) | null = null;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer = createRenderer(canvas);
+    canvas.addEventListener("webglcontextlost", this.lost);
     addLights(this.scene);
     this.camera.matrixAutoUpdate = false;
     this.world.visible = false;
@@ -64,8 +67,13 @@ export class ArStage {
   }
 
   private fit(): void {
-    this.renderer.setSize(this.canvas.clientWidth || 1, this.canvas.clientHeight || 1, false);
+    fitRenderer(this.renderer, this.canvas);
   }
+
+  private readonly lost = (e: Event) => {
+    e.preventDefault();
+    if (!this.disposed) this.onContextLost?.();
+  };
 
   /** Metres per board width, chosen so Mochi is calibration.size board widths tall. */
   private get unit(): number {
@@ -165,8 +173,10 @@ export class ArStage {
   }
 
   dispose(): void {
+    this.disposed = true;
     this.renderer.setAnimationLoop(null);
     this.resize.disconnect();
-    this.renderer.dispose();
+    this.canvas.removeEventListener("webglcontextlost", this.lost);
+    releaseRenderer(this.renderer);
   }
 }

@@ -12,10 +12,10 @@ async function ownAvatarExists(): Promise<boolean> {
 }
 
 /** Load the student's own avatar if there is one, else the sample model. */
-export async function loadMochi(onProgress?: (f: number) => void): Promise<MochiAvatar> {
+export async function loadMochi(onProgress?: (f: number) => void, maxTextureSize?: number): Promise<MochiAvatar> {
   // In dev a freshly exported mochi.vrm shows up on reload; a build already knows what it shipped.
   const own = import.meta.env.DEV ? await ownAvatarExists() : __OWN_AVATAR__;
-  return MochiAvatar.load(own ? AVATAR_URL : SAMPLE_AVATAR_URL, onProgress);
+  return MochiAvatar.load(own ? AVATAR_URL : SAMPLE_AVATAR_URL, onProgress, maxTextureSize);
 }
 
 /** Mochi standing in the right-hand column of the board. */

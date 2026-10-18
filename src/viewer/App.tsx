@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MochiAvatar } from "../avatar/mochi";
-import { AvatarStage } from "../avatar/stage";
+import { AvatarStage, isPhone } from "../avatar/stage";
 import { loadMochi } from "../board/MochiPip";
 import { smoothVisemes } from "../live/lipsync";
 import type { Visemes } from "../shared/protocol";
@@ -97,9 +97,25 @@ export function ViewerApp({ room }: { room: string | null }) {
     return () => socket.close();
   }, [room]);
 
-  // Load the avatar once.
+  // Show what went wrong instead of a page that silently stops.
   useEffect(() => {
-    loadMochi((f) => setAvatarState(`Loading Mochi ${Math.round(f * 100)}%`))
+    const onError = (e: ErrorEvent) => {
+      // Chrome reports harmless ResizeObserver loop notices as errors.
+      if (!/ResizeObserver/.test(e.message)) setError(e.message || "Something went wrong.");
+    };
+    const onRejection = (e: PromiseRejectionEvent) =>
+      setError(e.reason instanceof Error ? e.reason.message : String(e.reason));
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, []);
+
+  // Load the avatar once. Phones get 1024 px textures so the model fits in their graphics memory.
+  useEffect(() => {
+    loadMochi((f) => setAvatarState(`Loading Mochi ${Math.round(f * 100)}%`), isPhone() ? 1024 : undefined)
       .then((a) => {
         avatar.current = a;
         setAvatarState("");
@@ -129,6 +145,10 @@ export function ViewerApp({ room }: { room: string | null }) {
     stage.setCalibration(calRef.current);
     if (avatar.current) stage.setAvatar(avatar.current);
     stage.onFrame = tickMouth;
+    stage.onContextLost = () => {
+      setError("Your phone ran out of graphics memory. Close other tabs and try again, or use the 3D view.");
+      setMode("intro");
+    };
 
     const loop = async () => {
       while (!stopped) {
@@ -150,7 +170,8 @@ export function ViewerApp({ room }: { room: string | null }) {
 
     navigator.mediaDevices
       .getUserMedia({
-        video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        // Tracking runs at 1280 px anyway, and a 1080p stream costs phones memory for nothing.
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       })
       .then(async (s) => {
@@ -236,10 +257,24 @@ export function ViewerApp({ room }: { room: string | null }) {
             </p>
           )}
           <div className="intro-actions">
-            <button type="button" className="btn btn-primary" onClick={() => setMode("ar")}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setError(null);
+                setMode("ar");
+              }}
+            >
               Start camera
             </button>
-            <button type="button" className="btn" onClick={() => setMode("3d")}>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                setError(null);
+                setMode("3d");
+              }}
+            >
               3D view instead
             </button>
           </div>
@@ -248,8 +283,8 @@ export function ViewerApp({ room }: { room: string | null }) {
       ) : (
         <>
           <div className="pill" aria-live="polite">
-            <span className="dot" data-on={mode === "ar" ? tracking : boardOnline} />
-            {avatarState || status}
+            <span className="dot" data-on={!error && (mode === "ar" ? tracking : boardOnline)} />
+            {error || avatarState || status}
           </div>
           <div className="bar">
             {mode === "ar" && (

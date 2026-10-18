@@ -91,6 +91,48 @@ function gesturePose(name: Exclude<Gesture, "none">, u: number, t: number): Pose
   }
 }
 
+/** Redraw every texture bigger than maxSize at a smaller size, keeping its aspect ratio. */
+export function shrinkTextures(root: THREE.Object3D, maxSize: number): void {
+  const seen = new Set<THREE.Texture>();
+  const textures: THREE.Texture[] = [];
+  const collect = (value: unknown) => {
+    if (value instanceof THREE.Texture && !seen.has(value)) {
+      seen.add(value);
+      textures.push(value);
+    }
+  };
+  root.traverse((obj) => {
+    const material = (obj as THREE.Mesh).material;
+    if (!material) return;
+    for (const m of Array.isArray(material) ? material : [material]) {
+      for (const value of Object.values(m)) collect(value);
+      // MToon keeps its textures in shader uniforms.
+      for (const u of Object.values((m as THREE.ShaderMaterial).uniforms ?? {})) collect(u?.value);
+    }
+  });
+  // Textures can share one image, so each image is redrawn once and closed at the end.
+  const redrawn = new Map<unknown, HTMLCanvasElement>();
+  for (const texture of textures) {
+    const image = texture.image as (CanvasImageSource & { width: number; height: number }) | undefined;
+    if (!image?.width || !image.height) continue;
+    const scale = maxSize / Math.max(image.width, image.height);
+    if (scale >= 1) continue;
+    let canvas = redrawn.get(image);
+    if (!canvas) {
+      canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      canvas.getContext("2d")?.drawImage(image, 0, 0, canvas.width, canvas.height);
+      redrawn.set(image, canvas);
+    }
+    texture.image = canvas;
+    texture.needsUpdate = true;
+  }
+  for (const image of redrawn.keys()) {
+    if (typeof ImageBitmap !== "undefined" && image instanceof ImageBitmap) image.close();
+  }
+}
+
 export class MochiAvatar {
   readonly root = new THREE.Group();
   /** Approximate height in metres before any scaling. */
@@ -125,7 +167,16 @@ export class MochiAvatar {
     this.height = (p.y || 1.4) + 0.14;
   }
 
-  static async load(url: string, onProgress?: (fraction: number) => void): Promise<MochiAvatar> {
+  /**
+   * Load a VRM. `maxTextureSize` shrinks bigger textures: VRoid exports carry
+   * 2048 px body and normal maps, about 100 MB of graphics memory in all,
+   * which is enough to crash a phone's browser tab.
+   */
+  static async load(
+    url: string,
+    onProgress?: (fraction: number) => void,
+    maxTextureSize = Number.POSITIVE_INFINITY,
+  ): Promise<MochiAvatar> {
     const loader = new GLTFLoader();
     loader.register((parser) => new VRMLoaderPlugin(parser));
     const gltf = await loader.loadAsync(url, (e) => {
@@ -135,6 +186,7 @@ export class MochiAvatar {
     if (!vrm) throw new Error(`${url} is not a VRM model`);
     VRMUtils.removeUnnecessaryVertices(gltf.scene);
     VRMUtils.combineSkeletons(gltf.scene);
+    if (Number.isFinite(maxTextureSize)) shrinkTextures(gltf.scene, maxTextureSize);
     return new MochiAvatar(vrm);
   }
 
