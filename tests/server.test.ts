@@ -1,6 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { brotliCompressSync } from "node:zlib";
 import { startApp } from "../server/app";
-import { RateLimiter } from "../server/rate-limit";
+import { clientAddress, matchesAny } from "../server/net";
+import { DailyCap, RateLimiter } from "../server/rate-limit";
 import { parseMessage } from "../src/shared/protocol";
 
 let server: ReturnType<typeof startApp>;
@@ -17,6 +22,7 @@ beforeAll(() => {
     locate: async (_image, target) => (target === "nowhere" ? null : [10, 20, 30, 40]),
     sessionLimit: 3,
     sessionWindowMs: 60_000,
+    exposeNetwork: true,
   });
 });
 
@@ -69,6 +75,99 @@ describe("http api", () => {
   test("network lists addresses", async () => {
     const body = await (await http("/api/network")).json();
     expect(Array.isArray(body.addresses)).toBe(true);
+  });
+});
+
+describe("public deploy", () => {
+  const dir = mkdtempSync(join(tmpdir(), "mochi-static-"));
+  mkdirSync(join(dir, "assets"));
+  writeFileSync(join(dir, "index.html"), "<h1>board</h1>");
+  writeFileSync(join(dir, "assets", "app-abc.js"), "1");
+  writeFileSync(join(dir, "assets", "big.js"), "x".repeat(5000));
+  writeFileSync(join(dir, "assets", "big.js.br"), brotliCompressSync("x".repeat(5000)));
+  writeFileSync(join(dir, "..", "mochi-secret.txt"), "nope");
+  let s: ReturnType<typeof startApp>;
+  let grants = 0;
+
+  beforeAll(() => {
+    s = startApp({
+      host: "127.0.0.1",
+      port: 0,
+      createGrant: async () => {
+        grants++;
+        return { token: "auth_tokens/x", model: "m", voice: "v", expiresAt: "later" };
+      },
+      locate: null,
+      sessionLimit: 100,
+      sessionWindowMs: 60_000,
+      dailySessionLimit: 2,
+      staticDir: dir,
+    });
+  });
+  afterAll(() => s.stop(true));
+  const get = (path: string, init?: RequestInit) => fetch(new URL(path, s.url), init);
+
+  test("the daily cap stops sessions for everyone", async () => {
+    const statuses: number[] = [];
+    for (let i = 0; i < 3; i++) statuses.push((await get("/api/sessions", { method: "POST" })).status);
+    expect(statuses).toEqual([201, 201, 429]);
+    expect(grants).toBe(2);
+    const res = await get("/api/sessions", { method: "POST" });
+    expect((await res.json()).error).toContain("tomorrow");
+    expect(Number(res.headers.get("retry-after"))).toBeGreaterThan(0);
+  });
+
+  test("LAN addresses stay private", async () => {
+    expect((await get("/api/network")).status).toBe(404);
+  });
+
+  test("static files are served with the right caching and nothing outside the folder", async () => {
+    const index = await get("/");
+    expect(await index.text()).toBe("<h1>board</h1>");
+    expect(index.headers.get("cache-control")).toBe("no-cache");
+    expect((await get("/assets/app-abc.js")).headers.get("cache-control")).toContain("immutable");
+    expect((await get("/assets")).status).toBe(404);
+    expect((await get("/%2e%2e/mochi-secret.txt")).status).toBe(404);
+    expect((await get("/%E0%A4%A")).status).toBe(404);
+  });
+
+  test("brotli copies are sent to browsers that accept them", async () => {
+    const br = await get("/assets/big.js", { headers: { "accept-encoding": "gzip, br" } });
+    expect(br.headers.get("content-encoding")).toBe("br");
+    expect(br.headers.get("content-type")).toContain("javascript");
+    expect(await br.text()).toBe("x".repeat(5000));
+    const plain = await get("/assets/big.js", { headers: { "accept-encoding": "gzip" } });
+    expect(plain.headers.get("content-encoding")).toBeNull();
+    expect((await plain.text()).length).toBe(5000);
+  });
+
+  test("cross-site WebSockets are refused", async () => {
+    const res = await get("/ws/rooms/abcdef12?role=board", { headers: { origin: "https://evil.example" } });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("client address", () => {
+  const trusted = ["127.0.0.1", "10.89.0.0/24"];
+
+  test("forwarded addresses are only believed from trusted proxies", () => {
+    expect(clientAddress("10.89.0.7", "203.0.113.9", trusted)).toBe("203.0.113.9");
+    expect(clientAddress("::ffff:10.89.0.7", "203.0.113.9", trusted)).toBe("203.0.113.9");
+    expect(clientAddress("198.51.100.4", "203.0.113.9", trusted)).toBe("198.51.100.4");
+    expect(clientAddress("10.89.1.7", "203.0.113.9", trusted)).toBe("10.89.1.7");
+    expect(clientAddress("10.89.0.7", null, trusted)).toBe("10.89.0.7");
+  });
+
+  test("a spoofed first entry is ignored", () => {
+    expect(clientAddress("127.0.0.1", "1.1.1.1, 203.0.113.9", trusted)).toBe("203.0.113.9");
+  });
+
+  test("cidr matching", () => {
+    expect(matchesAny("10.0.0.255", ["10.0.0.0/24"])).toBe(true);
+    expect(matchesAny("10.0.1.0", ["10.0.0.0/24"])).toBe(false);
+    expect(matchesAny("8.8.8.8", ["0.0.0.0/0"])).toBe(true);
+    expect(matchesAny("::1", ["::1"])).toBe(true);
+    expect(matchesAny("not-an-ip", ["10.0.0.0/8"])).toBe(false);
   });
 });
 
@@ -169,5 +268,15 @@ describe("rate limiter", () => {
     expect(r.take("a", 20)).toBe(980);
     expect(r.take("b", 20)).toBe(0);
     expect(r.take("a", 1000)).toBe(0);
+  });
+
+  test("daily cap resets at UTC midnight", () => {
+    const day = Date.parse("2026-10-18T00:00:00Z");
+    const cap = new DailyCap(2);
+    expect(cap.take(day + 1000)).toBe(0);
+    expect(cap.take(day + 2000)).toBe(0);
+    expect(cap.take(day + 3_600_000)).toBe(86_400_000 - 3_600_000);
+    expect(cap.take(day + 86_400_000)).toBe(0);
+    expect(new DailyCap(0).take(day)).toBe(0);
   });
 });

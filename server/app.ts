@@ -1,10 +1,11 @@
-import { existsSync } from "node:fs";
+import { statSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { join, normalize, resolve } from "node:path";
 import type { Server, ServerWebSocket } from "bun";
 import { ROOM_CODE, type Role } from "../src/shared/protocol";
 import type { Box, SessionGrant } from "./gemini";
-import { RateLimiter } from "./rate-limit";
+import { clientAddress, matchesAny } from "./net";
+import { DailyCap, RateLimiter } from "./rate-limit";
 import { Rooms } from "./rooms";
 
 export interface AppOptions {
@@ -16,6 +17,16 @@ export interface AppOptions {
   locate: ((imageBase64: string, target: string) => Promise<Box | null>) | null;
   sessionLimit: number;
   sessionWindowMs: number;
+  /** Live sessions everyone together may start per UTC day; 0 means no cap. */
+  dailySessionLimit?: number;
+  /** Notebook lookups everyone together may make per UTC day; 0 means no cap. */
+  dailyLocateLimit?: number;
+  /** Proxies allowed to set X-Forwarded-For and X-Forwarded-Host: addresses or IPv4 CIDRs. */
+  trustedProxies?: string[];
+  /** Serve /api/network so the board can put the laptop's LAN address in the QR code. Dev only. */
+  exposeNetwork?: boolean;
+  /** Open WebSockets across all rooms. */
+  maxSockets?: number;
   staticDir?: string;
   tls?: { cert: string; key: string };
 }
@@ -38,44 +49,77 @@ export function lanAddresses(): string[] {
   return out;
 }
 
-function clientAddress(req: Request, server: Server<SocketData>): string {
-  const direct = server.requestIP(req)?.address ?? "unknown";
-  // The Vite dev server proxies from loopback and sets X-Forwarded-For.
-  const isLoopback = direct === "127.0.0.1" || direct === "::1" || direct === "::ffff:127.0.0.1";
-  const forwarded = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return isLoopback && forwarded ? forwarded : direct;
-}
+const LOOPBACK = ["127.0.0.1", "::1"];
 
-/** Reject cross-site POSTs: a page on another origin must not start sessions. */
-function sameOrigin(req: Request): boolean {
-  const origin = req.headers.get("origin");
-  if (!origin) return true;
-  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+const tooMany = (error: string, waitMs: number) =>
+  new Response(JSON.stringify({ error }), {
+    status: 429,
+    headers: { "content-type": "application/json", "retry-after": String(Math.ceil(waitMs / 1000)) },
+  });
+
+function isFile(path: string): boolean {
   try {
-    return new URL(origin).host === host;
+    return statSync(path).isFile();
   } catch {
     return false;
   }
 }
 
-function serveStatic(dir: string, pathname: string): Response | null {
-  let rel = decodeURIComponent(pathname);
+function serveStatic(dir: string, pathname: string, acceptEncoding: string): Response | null {
+  let rel: string;
+  try {
+    rel = decodeURIComponent(pathname);
+  } catch {
+    return null;
+  }
   if (rel === "/" || rel === "") rel = "/index.html";
   if (rel === "/viewer" || rel === "/viewer/") rel = "/viewer/index.html";
   const root = resolve(dir);
   const file = resolve(join(root, normalize(rel)));
-  if (!file.startsWith(root) || !existsSync(file)) return null;
-  const f = Bun.file(file);
-  const immutable = rel.startsWith("/assets/");
-  return new Response(f, {
-    headers: { "cache-control": immutable ? "public, max-age=31536000, immutable" : "no-cache" },
-  });
+  if (!file.startsWith(`${root}/`) || !isFile(file)) return null;
+  // Hashed build assets never change; the avatar is big, so let browsers keep it for a day.
+  const cache = rel.startsWith("/assets/")
+    ? "public, max-age=31536000, immutable"
+    : rel.startsWith("/avatars/")
+      ? "public, max-age=86400"
+      : "no-cache";
+  const original = Bun.file(file);
+  const headers: Record<string, string> = { "cache-control": cache, vary: "accept-encoding" };
+  // `bun run build` leaves a brotli copy next to big text and model files.
+  if (/\bbr\b/.test(acceptEncoding) && isFile(`${file}.br`)) {
+    return new Response(Bun.file(`${file}.br`), {
+      headers: { ...headers, "content-encoding": "br", "content-type": original.type },
+    });
+  }
+  return new Response(original, { headers });
 }
 
 export function startApp(opts: AppOptions): Server<SocketData> {
   const rooms = new Rooms<ServerWebSocket<SocketData>>();
   const limiter = new RateLimiter(opts.sessionLimit, opts.sessionWindowMs);
   const locateLimiter = new RateLimiter(40, 10 * 60_000);
+  const dailySessions = new DailyCap(opts.dailySessionLimit ?? 0);
+  const dailyLocates = new DailyCap(opts.dailyLocateLimit ?? 0);
+  const trusted = opts.trustedProxies ?? LOOPBACK;
+  const maxSockets = opts.maxSockets ?? 200;
+  let sockets = 0;
+
+  const peer = (req: Request, server: Server<SocketData>) => server.requestIP(req)?.address ?? "unknown";
+  const caller = (req: Request, server: Server<SocketData>) =>
+    clientAddress(peer(req, server), req.headers.get("x-forwarded-for"), trusted);
+
+  /** Reject cross-site requests: a page on another origin must not start sessions or join rooms. */
+  const sameOrigin = (req: Request, server: Server<SocketData>) => {
+    const origin = req.headers.get("origin");
+    if (!origin) return true;
+    const forwarded = matchesAny(peer(req, server), trusted) ? req.headers.get("x-forwarded-host") : null;
+    const host = forwarded ?? req.headers.get("host");
+    try {
+      return new URL(origin).host === host;
+    } catch {
+      return false;
+    }
+  };
 
   return Bun.serve<SocketData>({
     hostname: opts.host,
@@ -83,19 +127,23 @@ export function startApp(opts: AppOptions): Server<SocketData> {
     tls: opts.tls ? { cert: Bun.file(opts.tls.cert), key: Bun.file(opts.tls.key) } : undefined,
     routes: {
       "/api/health": { GET: () => json({ ok: true }) },
-      "/api/network": { GET: () => json({ addresses: lanAddresses() }) },
+      "/api/network": {
+        GET: () => (opts.exposeNetwork ? json({ addresses: lanAddresses() }) : json({ error: "Not found." }, 404)),
+      },
       "/api/sessions": {
         POST: async (req: Request, server: Server<SocketData>) => {
-          if (!sameOrigin(req)) return json({ error: "Cross-site requests are not allowed." }, 403);
+          if (!sameOrigin(req, server)) return json({ error: "Cross-site requests are not allowed." }, 403);
           if (!opts.createGrant) {
             return json({ error: "The server has no GEMINI_API_KEY. Add it to .env and restart." }, 503);
           }
-          const wait = limiter.take(clientAddress(req, server));
-          if (wait > 0) {
-            return new Response(JSON.stringify({ error: "Too many sessions. Try again in a bit." }), {
-              status: 429,
-              headers: { "content-type": "application/json", "retry-after": String(Math.ceil(wait / 1000)) },
-            });
+          const wait = limiter.take(caller(req, server));
+          if (wait > 0) return tooMany("Too many sessions. Try again in a bit.", wait);
+          const tomorrow = dailySessions.take();
+          if (tomorrow > 0) {
+            return tooMany(
+              "Mochi has taught all the lessons this demo allows today. Try again tomorrow, or run your own copy from GitHub.",
+              tomorrow,
+            );
           }
           let resumeHandle: string | undefined;
           const text = await req.text();
@@ -120,9 +168,12 @@ export function startApp(opts: AppOptions): Server<SocketData> {
       },
       "/api/notebook/locate": {
         POST: async (req: Request, server: Server<SocketData>) => {
-          if (!sameOrigin(req)) return json({ error: "Cross-site requests are not allowed." }, 403);
+          if (!sameOrigin(req, server)) return json({ error: "Cross-site requests are not allowed." }, 403);
           if (!opts.locate) return json({ error: "The server has no GEMINI_API_KEY." }, 503);
-          if (locateLimiter.take(clientAddress(req, server)) > 0) return json({ error: "Too many requests." }, 429);
+          const wait = locateLimiter.take(caller(req, server));
+          if (wait > 0) return tooMany("Too many requests.", wait);
+          const tomorrow = dailyLocates.take();
+          if (tomorrow > 0) return tooMany("The demo's notebook checks are used up for today.", tomorrow);
           const text = await req.text();
           if (text.length > 4_000_000) return json({ error: "The photo is too large." }, 413);
           let body: { image?: unknown; target?: unknown };
@@ -152,11 +203,13 @@ export function startApp(opts: AppOptions): Server<SocketData> {
         if (!ROOM_CODE.test(code) || (role !== "board" && role !== "viewer")) {
           return json({ error: "Bad room code or role." }, 400);
         }
+        if (!sameOrigin(req, server)) return json({ error: "Cross-site requests are not allowed." }, 403);
+        if (sockets >= maxSockets) return json({ error: "The server is busy. Try again in a minute." }, 503);
         if (server.upgrade(req, { data: { code, role } })) return undefined;
         return json({ error: "Expected a WebSocket upgrade." }, 426);
       }
-      if (opts.staticDir && req.method === "GET") {
-        const res = serveStatic(opts.staticDir, url.pathname);
+      if (opts.staticDir && (req.method === "GET" || req.method === "HEAD")) {
+        const res = serveStatic(opts.staticDir, url.pathname, req.headers.get("accept-encoding") ?? "");
         if (res) return res;
       }
       return json({ error: "Not found." }, 404);
@@ -165,12 +218,14 @@ export function startApp(opts: AppOptions): Server<SocketData> {
       maxPayloadLength: 4096,
       idleTimeout: 120,
       open(ws) {
+        sockets++;
         if (!rooms.join(ws.data.code, ws.data.role, ws)) ws.close(1008, "Room is full");
       },
       message(ws, message) {
         if (typeof message === "string") rooms.relay(ws.data.code, ws.data.role, message);
       },
       close(ws) {
+        sockets--;
         rooms.leave(ws.data.code, ws.data.role, ws);
       },
     },

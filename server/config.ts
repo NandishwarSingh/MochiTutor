@@ -8,6 +8,15 @@ function int(name: string, fallback: number): number {
   return n;
 }
 
+function list(name: string, fallback: string[]): string[] {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 export const config = {
   host: process.env.HOST ?? "127.0.0.1",
   port: int("PORT", 8787),
@@ -20,4 +29,13 @@ export const config = {
   /** Live sessions a single address may start per window */
   sessionLimit: int("SESSION_LIMIT", 12),
   sessionWindowMs: int("SESSION_WINDOW_MS", 10 * 60_000),
+  /** Live sessions everyone together may start per UTC day (0 = no cap), for a public demo */
+  dailySessionLimit: int("DAILY_SESSION_LIMIT", 0),
+  dailyLocateLimit: int("DAILY_LOCATE_LIMIT", 0),
+  /** Proxies whose X-Forwarded-For is believed, as addresses or IPv4 CIDRs */
+  trustedProxies: list("TRUSTED_PROXIES", ["127.0.0.1", "::1"]),
+  /** Built files to serve in production; defaults to ./dist next to the server */
+  staticDir: process.env.STATIC_DIR,
+  // Bun.env, not process.env: `bun build` bakes process.env.NODE_ENV in at compile time.
+  production: Bun.env.NODE_ENV === "production",
 };

@@ -4,10 +4,11 @@ import { startApp } from "./app";
 import { config } from "./config";
 import { createSessionGrant, locateInImage } from "./gemini";
 
-const distDir = resolve(import.meta.dir, "../dist");
+const distDir = config.staticDir ?? resolve(import.meta.dir, "../dist");
 const tls = config.tlsCert && config.tlsKey ? { cert: config.tlsCert, key: config.tlsKey } : undefined;
 
 if (!config.apiKey) console.warn("GEMINI_API_KEY is not set; lessons can't start until you add it to .env.");
+if (config.production && !existsSync(distDir)) console.warn(`No built files at ${distDir}; run bun run build first.`);
 
 const server = startApp({
   host: config.host,
@@ -21,7 +22,11 @@ const server = startApp({
     : null,
   sessionLimit: config.sessionLimit,
   sessionWindowMs: config.sessionWindowMs,
-  staticDir: existsSync(distDir) && process.env.NODE_ENV === "production" ? distDir : undefined,
+  dailySessionLimit: config.dailySessionLimit,
+  dailyLocateLimit: config.dailyLocateLimit,
+  trustedProxies: config.trustedProxies,
+  exposeNetwork: !config.production,
+  staticDir: config.production && existsSync(distDir) ? distDir : undefined,
   tls,
 });
 

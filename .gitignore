@@ -10,3 +10,4 @@ dist/
 .certs/
 public/avatars/*.vrm
 bench/clips/
+build/

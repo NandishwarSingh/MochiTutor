@@ -29,3 +29,26 @@ export class RateLimiter {
     }
   }
 }
+
+/** A cap on calls per UTC day across every caller, so a public demo can't use up the API quota. 0 means no cap. */
+export class DailyCap {
+  private day = "";
+  private count = 0;
+
+  constructor(private readonly limit: number) {}
+
+  /** Returns 0 when allowed, otherwise the milliseconds until the cap resets at UTC midnight. */
+  take(now = Date.now()): number {
+    if (this.limit <= 0) return 0;
+    const day = new Date(now).toISOString().slice(0, 10);
+    if (day !== this.day) {
+      this.day = day;
+      this.count = 0;
+    }
+    if (this.count < this.limit) {
+      this.count++;
+      return 0;
+    }
+    return Date.parse(`${day}T00:00:00Z`) + 86_400_000 - now;
+  }
+}

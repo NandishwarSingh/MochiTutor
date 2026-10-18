@@ -6,7 +6,8 @@
   "scripts": {
     "setup": "bun scripts/setup.ts",
     "dev": "bun scripts/dev.ts",
-    "build": "vite build",
+    "build": "vite build && bun scripts/compress.ts",
+    "build:server": "bun build server/index.ts --compile --minify --outfile build/mochitutor",
     "start": "NODE_ENV=production bun server/index.ts",
     "bench": "bun scripts/bench-latency.ts",
     "test": "bun test",
