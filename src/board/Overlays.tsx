@@ -66,14 +66,28 @@ export function Intro() {
         Mochi
       </motion.h1>
       <p>Maths, probability, stats and anything else. Talk in Hindi, Hinglish or English.</p>
+      <small>
+        Mochi runs on Google's Gemini API. When a lesson starts, your voice goes to Google, and so do camera frames
+        while she can see you.
+      </small>
     </motion.div>
+  );
+}
+
+/** A dev server on this laptop or the LAN, reached by name or IP, with a self-signed certificate. */
+function onLocalNetwork(hostname: string): boolean {
+  return (
+    ["localhost", "127.0.0.1", "[::1]"].includes(hostname) ||
+    hostname.endsWith(".local") ||
+    /^\d+\.\d+\.\d+\.\d+$/.test(hostname)
   );
 }
 
 export function PairSheet({ room, onClose }: { room: string; onClose(): void }) {
   const [url, setUrl] = useState<string | null>(null);
+  const lan = onLocalNetwork(location.hostname);
   useEffect(() => {
-    const local = ["localhost", "127.0.0.1", "::1"].includes(location.hostname);
+    const local = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
     const build = (host: string) => `${location.protocol}//${host}/viewer/?room=${room}`;
     if (!local) {
       setUrl(build(location.host));
@@ -113,9 +127,9 @@ export function PairSheet({ room, onClose }: { room: string; onClose(): void }) 
           <div className="qr" dangerouslySetInnerHTML={{ __html: url ? renderSVG(url, { border: 1 }) : "" }} />
           <div>
             <ol>
-              <li>Connect the phone to the same Wi-Fi.</li>
+              {lan && <li>Connect the phone to the same Wi-Fi.</li>}
               <li>Scan the code with the phone camera.</li>
-              {secure && <li>The certificate is self-signed, so tap through the warning once.</li>}
+              {lan && secure && <li>The certificate is self-signed, so tap through the warning once.</li>}
               <li>Point the phone at this screen so all four corner squares are visible.</li>
             </ol>
             {url && <div className="url">{url}</div>}

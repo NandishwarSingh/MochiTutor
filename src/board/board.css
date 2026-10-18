@@ -303,6 +303,16 @@ button {
   max-width: 34ch;
 }
 
+.intro small {
+  display: block;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--chalk-soft);
+  opacity: 0.75;
+  margin: 22px auto 0;
+  max-width: 46ch;
+}
+
 /* ---- avatar corner ------------------------------------------------- */
 
 .pip {

@@ -1,3 +1,4 @@
+import "../shared/fonts";
 import "katex/dist/katex.min.css";
 import "./board.css";
 import { createRoot } from "react-dom/client";

@@ -1,3 +1,4 @@
+import "../shared/fonts";
 import "./viewer.css";
 import { createRoot } from "react-dom/client";
 import { ROOM_CODE } from "../shared/protocol";

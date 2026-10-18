@@ -6,11 +6,16 @@ import type { Lesson } from "./lesson";
 export const AVATAR_URL = "/avatars/mochi.vrm";
 export const SAMPLE_AVATAR_URL = "/avatars/sample.vrm";
 
+async function ownAvatarExists(): Promise<boolean> {
+  const res = await fetch(AVATAR_URL, { method: "HEAD" }).catch(() => null);
+  return Boolean(res?.ok && !res.headers.get("content-type")?.includes("text/html"));
+}
+
 /** Load the student's own avatar if there is one, else the sample model. */
 export async function loadMochi(onProgress?: (f: number) => void): Promise<MochiAvatar> {
-  const own = await fetch(AVATAR_URL, { method: "HEAD" }).catch(() => null);
-  const isVrm = own?.ok && !own.headers.get("content-type")?.includes("text/html");
-  return MochiAvatar.load(isVrm ? AVATAR_URL : SAMPLE_AVATAR_URL, onProgress);
+  // In dev a freshly exported mochi.vrm shows up on reload; a build already knows what it shipped.
+  const own = import.meta.env.DEV ? await ownAvatarExists() : __OWN_AVATAR__;
+  return MochiAvatar.load(own ? AVATAR_URL : SAMPLE_AVATAR_URL, onProgress);
 }
 
 /** Mochi standing in the right-hand column of the board. */
