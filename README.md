@@ -2,6 +2,8 @@
 
 A cute 3D tutor that teaches you out loud in Hindi, Hinglish or English. Your laptop screen is the board, and if you point your phone at the laptop you see Mochi standing on the desk next to it.
 
+Try it at **[mochitutor.nandishwarsingh.com](https://mochitutor.nandishwarsingh.com)** (Chrome or Safari on a laptop, with a mic).
+
 It's built for maths, probability and stats first. Mochi writes on the board as she talks, runs little simulations, does exact arithmetic instead of guessing, and can look at your notebook through the webcam and circle the step you got wrong.
 
 ![Mochi explaining two dice on the board](docs/board-dice.jpg)
@@ -51,6 +53,21 @@ For the phone: same Wi-Fi, press the phone button in the dock, scan the QR code,
 
 To use your own VRoid character, export it as VRM and save it as `public/avatars/mochi.vrm`.
 
+## Hosting it
+
+The live demo is this repo as-is, running behind Caddy on a small VPS.
+
+```sh
+SITE_URL=https://your.domain bun run build   # dist/ plus link previews, robots.txt, a sitemap and brotli copies
+bun run build:server                          # the server as one binary in build/ (add --target=bun-linux-x64 to cross-compile)
+```
+
+Run the binary with `NODE_ENV=production`, `STATIC_DIR` pointing at `dist/` and `GEMINI_API_KEY` set, behind a proxy that does TLS (phones only open the camera on https) and passes WebSockets through. Settings worth knowing:
+
+- `TRUSTED_PROXIES`: addresses or IPv4 CIDRs allowed to set X-Forwarded-For, so the per-visitor limits see real IPs. Loopback by default.
+- `SESSION_LIMIT` and `SESSION_WINDOW_MS`: Live sessions per visitor, 12 per 10 minutes by default.
+- `DAILY_SESSION_LIMIT` and `DAILY_LOCATE_LIMIT`: caps across everyone per UTC day, so a public link can't use up your free quota. Off by default; the demo allows 100 lessons a day.
+
 ## Numbers
 
 Latency, measured with `bun run bench`. The script streams recorded Hinglish and English questions in real time through the same token path the browser uses, with the app's real config and tool handlers, and times from the end of speech to Mochi's first audio. That includes Gemini's own wait to decide you've finished talking.
@@ -67,7 +84,7 @@ Phone tracking, from `tests/pose.test.ts`: on a rendered 1280x720 view of the bo
 ## Checks
 
 ```sh
-bun test             # 68 tests: maths, simulations, tools, moods, server, rooms, lip sync, pose
+bun test             # 77 tests: maths, simulations, tools, moods, server, rooms, lip sync, pose
 bun run typecheck
 bun run lint
 bun run build
@@ -91,7 +108,8 @@ bun run build
 - The Live models are previews on Google's free tier. Limits can change, and the free tier may use what you send (voice, camera frames) to improve Google's products. Fine for a personal demo, not for other people's kids.
 - The phone AR has only been tested against rendered camera images so far.
 - Lip sync is worked out from the audio spectrum, so it's convincing at a glance, not perfect.
-- The self-signed certificate means a browser warning on first open.
+- Running it yourself, the self-signed certificate means a browser warning on first open. The hosted demo has a real one.
+- The hosted demo stops starting lessons after 100 a day, and the sample avatar is a 7 MB download.
 
 ## Credits
 
