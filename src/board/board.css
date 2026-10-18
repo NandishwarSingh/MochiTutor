@@ -181,8 +181,9 @@ button {
 
 .doors {
   display: flex;
-  gap: 22px;
-  align-items: flex-end;
+  gap: 28px;
+  align-items: flex-start;
+  padding-left: 14px;
 }
 
 .door {
@@ -191,9 +192,10 @@ button {
 }
 
 .door-label {
-  font-size: 20px;
+  font-size: 18px;
   color: var(--chalk-soft);
-  margin-top: 4px;
+  margin: 4px -14px 0;
+  white-space: nowrap;
 }
 
 .door[data-picked="true"] .door-label {
@@ -667,11 +669,11 @@ button {
 
 @media (prefers-reduced-motion: reduce) {
   /* Keep writing clear of the corner markers while a phone is tracking them. */
-.app[data-phone="true"] .board {
-  padding-left: calc(min(240px, max(110px, 12vw)) + 30px);
-}
+  .app[data-phone="true"] .board {
+    padding-left: calc(min(240px, max(110px, 12vw)) + 30px);
+  }
 
-.board-scroll {
+  .board-scroll {
     scroll-behavior: auto;
   }
 }

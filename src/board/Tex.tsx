@@ -33,7 +33,7 @@ export function RichText({ text }: { text: string }) {
     <>
       {parts.map((p, i) =>
         // biome-ignore lint/suspicious/noArrayIndexKey: parts are derived from a fixed string
-        p.math ? <Tex key={i} tex={p.value} /> : <span key={i}>{p.value}</span>,
+        p.math ? <Tex key={i} tex={p.value} /> : <span key={i}>{p.value.replace(/->/g, "→").replace(/=>/g, "⇒")}</span>,
       )}
     </>
   );
