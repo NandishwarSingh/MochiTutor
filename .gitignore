@@ -7,3 +7,6 @@ dist/
 *.sqlite
 *.sqlite-*
 .DS_Store
+.certs/
+public/avatars/*.vrm
+bench/clips/

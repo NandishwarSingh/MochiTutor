@@ -1,0 +1,42 @@
+{
+  "name": "mochitutor",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "setup": "bun scripts/setup.ts",
+    "dev": "bun scripts/dev.ts",
+    "build": "vite build",
+    "start": "NODE_ENV=production bun server/index.ts",
+    "bench": "bun scripts/bench-latency.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome check --write ."
+  },
+  "dependencies": {
+    "@google/genai": "^2.30.0",
+    "@pixiv/three-vrm": "^3.5.5",
+    "katex": "^0.19.0",
+    "motion": "^14.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "three": "^0.186.1",
+    "uqr": "^0.1.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
+    "@types/bun": "^1.4.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/three": "^0.186.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4"
+  },
+  "description": "A cute 3D AI tutor that teaches on your laptop screen and stands next to it in AR",
+  "license": "MIT",
+  "engines": {
+    "bun": ">=1.3"
+  }
+}

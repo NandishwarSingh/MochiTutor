@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "files": {
+    "includes": ["**", "!src/vendor", "!dist", "!public/avatars", "!.probe", "!bench/clips"]
+  },
+  "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 120 },
+  "linter": {
+    "rules": {
+      "preset": "recommended",
+      "a11y": { "noSvgWithoutTitle": "off" },
+      "style": { "noNonNullAssertion": "off" }
+    }
+  },
+  "javascript": { "formatter": { "quoteStyle": "double" } }
+}
