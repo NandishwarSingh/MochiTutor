@@ -1,0 +1,85 @@
+{
+  "date": "2026-10-18T06:30:52.050Z",
+  "model": "gemini-3.8-live",
+  "runs": 9,
+  "firstAudioMs": {
+    "median": 2947,
+    "p90": 3401,
+    "min": 1355,
+    "max": 3401
+  },
+  "results": [
+    {
+      "clip": "hinglish-coin",
+      "firstAudioMs": 2620,
+      "firstToolMs": 1725,
+      "tools": ["react"],
+      "heard": "Mochi, mujhe probability samjhao na coin toss mein heads aane ka chance kitna hai?",
+      "said": "Hey there! Probability bahut simple hai. Batao, jab tum ek coin toss karte ho, toh kya kya outcomes ho sakte hain?"
+    },
+    {
+      "clip": "hinglish-coin",
+      "firstAudioMs": 2756,
+      "firstToolMs": 1377,
+      "tools": ["react", "flip_coins"],
+      "heard": "Mochi, mujhe probability samjhao na coin toss mein heads aane ka chance kitna hai?",
+      "said": "Hey there! Main bilkul excited hoon probability explain karne ke liye. Ek coin mein heads aur tails equal chances ke saath aate hain, toh heads aane ka chance one out of two hai. Kya aapko pata hai ise hum fractions mein kaise likhte hain?"
+    },
+    {
+      "clip": "hinglish-coin",
+      "firstAudioMs": 1355,
+      "firstToolMs": null,
+      "tools": [],
+      "heard": "Mochi, mujhe probability samjhao na coin toss mein heads aane ka chance kitna hai?",
+      "said": "Hello! Probability samajhna toh bahut mazedaar hai. Haan, coin toss mein heads aane ka chance kitna hota hai, yeh toh hum zaroor dekhenge! Par usse pehle, kya aapko probability ka basic idea hai kuch?"
+    },
+    {
+      "clip": "hinglish-dice",
+      "firstAudioMs": 3009,
+      "firstToolMs": 1567,
+      "tools": ["clear_board", "write_on_board"],
+      "heard": "Achha, agar main do dice roll karun to sum 7 aane ki probability kya hogi? Board par likh ke batao.",
+      "said": "Jab hum do dice roll karte hain, toh total possible outcomes kitne hote hain, kya aap bata sakte ho?"
+    },
+    {
+      "clip": "hinglish-dice",
+      "firstAudioMs": 3340,
+      "firstToolMs": 2214,
+      "tools": ["clear_board", "write_on_board"],
+      "heard": "Achha, agar main do dice roll karun to sum 7 aane ki probability kya hogi? Board par likh ke batao.",
+      "said": "Jab hum do dice roll karte hain, toh total outcomes hote hain \\(6 \\times 6 = 36\\). Sum seven lane ke liye hamare paas \\(6\\) favourable outcomes hain, jaise \\((1,6)\\), \\((2,5)\\), aur isi tarah. Toh probability hui \\(6\\) over \\(36\\), jo ki simplify ho kar \\(1\\) over \\(6\\) ban jati hai. Kya yeh samajh aaya aapko?"
+    },
+    {
+      "clip": "hinglish-dice",
+      "firstAudioMs": 3401,
+      "firstToolMs": 2328,
+      "tools": ["write_on_board"],
+      "heard": "Achha, agar main do dice roll karun to sum 7 aane ki probability kya hogi? Board par likh ke batao.",
+      "said": "Jab hum do dice roll karte hain, toh total outcomes hote hain 6 times 6, yaani 36. Kya aap bata sakte hain ki kaun-kaun se outcomes par sum 7 aayega?"
+    },
+    {
+      "clip": "english-monty",
+      "firstAudioMs": 3154,
+      "firstToolMs": null,
+      "tools": [],
+      "heard": "Okay Monty, can you explain the Monty Hall problem to me?",
+      "said": "Hello there! I would love to explain the Monty Hall problem to you. Have you heard about this puzzle before, or is it totally new to you?"
+    },
+    {
+      "clip": "english-monty",
+      "firstAudioMs": 2562,
+      "firstToolMs": 1756,
+      "tools": ["monty_hall"],
+      "heard": "Okay Monty, can you explain the Monty Hall problem to me?",
+      "said": "Hello! I'd love to help you understand the Monty Hall problem. We have three doors here, and behind one is a car, and the others have goats. Which door do you want to pick?"
+    },
+    {
+      "clip": "english-monty",
+      "firstAudioMs": 2947,
+      "firstToolMs": 1713,
+      "tools": ["monty_hall"],
+      "heard": "Okay Monty, can you explain the Monty Hall problem to me?",
+      "said": "Hello! I'd love to explain the Monty Hall problem to you. Let's start by playing a quick game, so please pick a door: 1, 2, or 3."
+    }
+  ]
+}

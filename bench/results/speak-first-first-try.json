@@ -1,0 +1,85 @@
+{
+  "date": "2026-10-18T06:34:59.577Z",
+  "model": "gemini-3.8-live",
+  "runs": 9,
+  "firstAudioMs": {
+    "median": 1815,
+    "p90": 9525,
+    "min": 1209,
+    "max": 9525
+  },
+  "results": [
+    {
+      "clip": "hinglish-coin",
+      "firstAudioMs": 1815,
+      "firstToolMs": 2903,
+      "tools": ["flip_coins"],
+      "heard": "Mochi, mujhe probability samjhao na coin toss mein heads aane ka chance kitna hai?",
+      "said": "Haan bilkul! Probability samajhne ke liye, chalo ek coin toss karke dekhte hain."
+    },
+    {
+      "clip": "hinglish-coin",
+      "firstAudioMs": 1284,
+      "firstToolMs": 2115,
+      "tools": ["flip_coins"],
+      "heard": "Mochi, mujhe probability samjhao na coin toss mein heads aane ka chance kitna hai?",
+      "said": "Hey there! Probability bahut simple hai, challo ise ek coin toss ke example se samajhte hain."
+    },
+    {
+      "clip": "hinglish-coin",
+      "firstAudioMs": 9525,
+      "firstToolMs": null,
+      "tools": [],
+      "heard": "Mochi, mujhe probability samjhao na coin toss mein heads aane ka chance kitna hai?",
+      "said": "Hello! Probability samajhne ke liye, chaliye ek simple coin toss se start karte hain. Aapke hisab se, ek coin toss karne par heads aane ka chance kitna hota hai?"
+    },
+    {
+      "clip": "hinglish-dice",
+      "firstAudioMs": 3127,
+      "firstToolMs": 1591,
+      "tools": ["clear_board", "write_on_board"],
+      "heard": "Achha, agar main do dice roll karun to sum 7 aane ki probability kya hogi? Board par likh ke batao.",
+      "said": "Jab aap do dice roll karte ho, toh total outcomes hote hain 36. Sum 7 lane ke liye 6 favorable outcomes hain, jaise (1,6) ya (2,5). Toh probability hui 6 by 36, yaani 1 by 6. Kya aapko yeh clear hua?"
+    },
+    {
+      "clip": "hinglish-dice",
+      "firstAudioMs": 3472,
+      "firstToolMs": null,
+      "tools": [],
+      "heard": "Achha, agar main do dice roll karun to sum 7 aane ki probability kya hogi? Board par likh ke batao.",
+      "said": "Hello! Chalo, saath mein milkar probability samajhte hain. Jab hum do dice roll karte hain, toh total kitne outcomes possibble hain, kya aapko pata hai?"
+    },
+    {
+      "clip": "hinglish-dice",
+      "firstAudioMs": 7540,
+      "firstToolMs": 6449,
+      "tools": ["clear_board", "write_on_board"],
+      "heard": "Achha, agar main do dice roll karun to sum 7 aane ki probability kya hogi? Board par likh ke batao.",
+      "said": "Probability of getting a sum of 7 is 6 by 36, jo simplify hoke 1 by 6 ho jata hai. Kya aapko ye samajh aaya ki 36 total outcomes kaise aaye?"
+    },
+    {
+      "clip": "english-monty",
+      "firstAudioMs": 1646,
+      "firstToolMs": 3582,
+      "tools": ["monty_hall"],
+      "heard": "Okay Monty, can you explain the Monty Hall problem to me?",
+      "said": "I'd love to help you understand the Monty Hall problem! Let's start by setting up the game."
+    },
+    {
+      "clip": "english-monty",
+      "firstAudioMs": 1494,
+      "firstToolMs": 3851,
+      "tools": ["monty_hall"],
+      "heard": "Okay Monty, can you explain the Monty Hall problem to me?",
+      "said": "Hello there! I would love to help you understand the Monty Hall problem. Let's start by playing a quick round together to see how it works."
+    },
+    {
+      "clip": "english-monty",
+      "firstAudioMs": 1209,
+      "firstToolMs": 2229,
+      "tools": ["monty_hall"],
+      "heard": "Okay Monty, can you explain the Monty Hall problem to me?",
+      "said": "I would love to help you with the Monty Hall problem today. Let's start with a fun game to see how it works."
+    }
+  ]
+}

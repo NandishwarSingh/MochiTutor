@@ -1,0 +1,131 @@
+{
+  "date": "2026-10-18T06:46:52.849Z",
+  "model": "gemini-3.8-live",
+  "runs": 12,
+  "firstAudioMs": {
+    "median": 2150.5,
+    "p90": 5423,
+    "min": 1542,
+    "max": 7624
+  },
+  "results": [
+    {
+      "clip": "hinglish-coin",
+      "firstAudioMs": 5423,
+      "firstToolMs": 6587,
+      "tools": [
+        "flip_coins"
+      ],
+      "heard": "Mochi, mujhe probability samjhao na coin toss mein heads aane ka chance kitna hai?",
+      "said": "Hello! Probability samajhna bahut mazedaar hai. Ek coin toss mein heads aane ka chance kitna hai, ye dekhne ke liye, chalo kuch flips karke dekhte hain."
+    },
+    {
+      "clip": "hinglish-coin",
+      "firstAudioMs": 7624,
+      "firstToolMs": 10179,
+      "tools": [
+        "flip_coins"
+      ],
+      "heard": "Mochi, mujhe probability samjhao na coin toss mein heads aane ka chance kitna hai?",
+      "said": "Haan bilkul! Probability samajhne ke liye ek coin toss se badhiya example aur kya ho sakta hai? Main abhi board par bahut saare flips dikhati hoon taaki tum samajh sako ki heads aane ka chance actual mein kitna hai."
+    },
+    {
+      "clip": "hinglish-coin",
+      "firstAudioMs": 2064,
+      "firstToolMs": null,
+      "tools": [],
+      "heard": "Mochi, mujhe probability samjhao na coin toss mein heads aane ka chance kitna hai?",
+      "said": "Hello! Main hoon Mochi, aur aaj hum probability bahut mazey se seekhenge. Batao, probability se tumhara kya matlab hai?"
+    },
+    {
+      "clip": "hinglish-coin",
+      "firstAudioMs": 1560,
+      "firstToolMs": 2877,
+      "tools": [
+        "flip_coins"
+      ],
+      "heard": "Mochi, mujhe probability samjhao na coin toss mein heads aane ka chance kitna hai?",
+      "said": "Hello! Probability samajhne ke liye coin toss ekdum badhiya example hai. Main abhi board par kuch coins flip karti hoon taaki tum dekh sako ki heads aane ka chance kitna hota hai."
+    },
+    {
+      "clip": "hinglish-dice",
+      "firstAudioMs": 2215,
+      "firstToolMs": 1491,
+      "tools": [
+        "write_on_board",
+        "write_on_board"
+      ],
+      "heard": "Achha, agar main do dice roll karun to sum 7 aane ki probability kya hogi? Board par likh ke batao.",
+      "said": "Jab hum do dice roll karte hain, toh total outcomes hote hain 6 times 6, yaani 36. Main board par likh deti hoon."
+    },
+    {
+      "clip": "hinglish-dice",
+      "firstAudioMs": 1945,
+      "firstToolMs": 5533,
+      "tools": [
+        "write_on_board"
+      ],
+      "heard": "Achha, agar main do dice roll karun to sum 7 aane ki probability kya hogi? Board par likh ke batao.",
+      "said": "Hey! Chalo saath mein milkar two dice aur sum of seven ka magic dekhte hain. Sabse pehle, mujhe batao ki ek die roll karne par kitne possible outcomes aate hain?"
+    },
+    {
+      "clip": "hinglish-dice",
+      "firstAudioMs": 2498,
+      "firstToolMs": 8610,
+      "tools": [
+        "write_on_board"
+      ],
+      "heard": "Achha, agar main do dice roll karun to sum 7 aane ki probability kya hogi? Board par likh ke batao.",
+      "said": "Hey there! Aaj hum probability ke bahut interesting problems solve karenge. Do dice roll karne par sum seven aane ki probability nikalne ke liye, sabse pehle total possibilities dekhte hain."
+    },
+    {
+      "clip": "hinglish-dice",
+      "firstAudioMs": 3708,
+      "firstToolMs": 2859,
+      "tools": [
+        "write_on_board",
+        "calculate"
+      ],
+      "heard": "Achha, agar main do dice roll karun to sum 7 aane ki probability kya hogi? Board par likh ke batao.",
+      "said": "Main calculate kar deti hoon ki hamare paas total kitne outcomes hain."
+    },
+    {
+      "clip": "english-monty",
+      "firstAudioMs": 1542,
+      "firstToolMs": 2929,
+      "tools": [
+        "monty_hall"
+      ],
+      "heard": "Okay Monty, can you explain the Monty Hall problem to me?",
+      "said": "Hello! I would love to help you understand the Monty Hall problem. Let's start a game to see how it works!"
+    },
+    {
+      "clip": "english-monty",
+      "firstAudioMs": 1689,
+      "firstToolMs": null,
+      "tools": [],
+      "heard": "Okay Monty, can you explain the Monty Hall problem to me?",
+      "said": "Hey there! I would love to explain the Monty Hall problem to you. Have you heard about this famous puzzle before?"
+    },
+    {
+      "clip": "english-monty",
+      "firstAudioMs": 2086,
+      "firstToolMs": 2912,
+      "tools": [
+        "monty_hall"
+      ],
+      "heard": "Okay Monty, can you explain the Monty Hall problem to me?",
+      "said": "Haan bilkul! Monty Hall problem samajhna bahut mazedaar hai. Chalo, pehle ise khelkar dekhte hain."
+    },
+    {
+      "clip": "english-monty",
+      "firstAudioMs": 2238,
+      "firstToolMs": 3123,
+      "tools": [
+        "monty_hall"
+      ],
+      "heard": "Okay Monty, can you explain the Monty Hall problem to me?",
+      "said": "Hey there! I would love to help you understand the Monty Hall problem. It is super fun, so let's play a game first!"
+    }
+  ]
+}
