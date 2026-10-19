@@ -6,7 +6,12 @@ import { AR } from "../vendor/aruco/aruco.js";
 registerMarkerDictionary(AR);
 const dictionary = new AR.Dictionary(MARKER_DICTIONARY);
 
-function useViewport() {
+/** The SVG for one marker id. */
+export function markerSvg(id: number): string {
+  return dictionary.generateSVG(id) as string;
+}
+
+export function useViewport() {
   const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight });
   useEffect(() => {
     const on = () => setSize({ w: window.innerWidth, h: window.innerHeight });
@@ -16,9 +21,13 @@ function useViewport() {
   return size;
 }
 
-/** ArUco markers in the screen corners so the phone can find the board. */
+/** Height of the control bar along the bottom of the board, which the markers stay above. */
+const BAR_HEIGHT = 60;
+
+/** ArUco markers in the corners of the board so the phone can find it. */
 export function Markers({ onLayout }: { onLayout: (w: number, h: number, markers: MarkerLayout[]) => void }) {
-  const { w, h } = useViewport();
+  const { w, h: screenH } = useViewport();
+  const h = screenH - BAR_HEIGHT;
   const layout = useMemo(() => markerLayout(w, h), [w, h]);
   const svgs = useMemo(() => CORNER_IDS.map((id) => dictionary.generateSVG(id) as string), []);
 

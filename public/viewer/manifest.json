@@ -1,0 +1,13 @@
+{
+  "name": "Mochi",
+  "short_name": "Mochi",
+  "description": "Mochi on your phone: the board and your tutor in AR, or in a headset.",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#131a16",
+  "theme_color": "#1d2621",
+  "icons": [
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/viewer/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

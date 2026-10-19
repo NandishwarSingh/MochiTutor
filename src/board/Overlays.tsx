@@ -15,6 +15,7 @@ export function Captions({ state }: { state: LessonState }) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
+            <b>You</b>
             {state.youSaid}
           </motion.div>
         )}
@@ -24,11 +25,11 @@ export function Captions({ state }: { state: LessonState }) {
           <motion.div
             key="err"
             className="caption-error"
+            role="alert"
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
           >
-            <span className="dot" />
             {state.error}
           </motion.div>
         ) : (
@@ -41,7 +42,7 @@ export function Captions({ state }: { state: LessonState }) {
               exit={{ opacity: 0, transition: { duration: 0.4 } }}
               transition={{ duration: 0.18 }}
             >
-              {state.mochiSays}
+              <span>{state.mochiSays}</span>
             </motion.div>
           )
         )}
@@ -50,27 +51,42 @@ export function Captions({ state }: { state: LessonState }) {
   );
 }
 
+const INTRO_LINES = [
+  { kind: "title", text: "Mochi" },
+  { kind: "text", text: "Your maths teacher. Talk to her in Hindi, Hinglish or English." },
+  { kind: "step", text: "Press Start lesson and just start talking." },
+  { kind: "step", text: "Ask about maths, probability, stats, anything." },
+];
+
+/** What's on the board before class: a few chalk lines, written in one after another. */
 export function Intro() {
   return (
-    <motion.div
-      className="intro"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0, transition: { duration: 0.3 } }}
-    >
-      <motion.h1
-        initial={{ clipPath: "inset(-10% 100% -10% 0)" }}
-        animate={{ clipPath: "inset(-10% 0% -10% 0)" }}
-        transition={{ duration: 0.9, ease: [0.3, 0.1, 0.3, 1] }}
-      >
-        Mochi
-      </motion.h1>
-      <p>Maths, probability, stats and anything else. Talk in Hindi, Hinglish or English.</p>
-      <small>
-        Mochi runs on Google's Gemini API. When a lesson starts, your voice goes to Google, and so do camera frames
-        while she can see you.
-      </small>
+    <motion.div className="intro" initial={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.3 } }}>
+      {INTRO_LINES.map((l, i) => (
+        <motion.div
+          key={l.text}
+          className={`line line-${l.kind}`}
+          initial={{ clipPath: "inset(-30% 100% -30% -10%)" }}
+          animate={{ clipPath: "inset(-30% -10% -30% -10%)" }}
+          transition={{ delay: 0.2 + i * 0.75, duration: 0.7, ease: [0.35, 0.1, 0.35, 1] }}
+        >
+          <span className="line-ink">
+            {l.kind === "step" && <span className="step-dot">→</span>}
+            <span>{l.text}</span>
+          </span>
+        </motion.div>
+      ))}
     </motion.div>
+  );
+}
+
+/** Small print under the empty board. */
+export function PrivacyNote() {
+  return (
+    <motion.p className="intro-note" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      Mochi runs on Google's Gemini API. When a lesson starts, your voice goes to Google, and so do camera frames while
+      she can see you.
+    </motion.p>
   );
 }
 
@@ -130,9 +146,16 @@ export function PairSheet({ room, onClose }: { room: string; onClose(): void }) 
               {lan && <li>Connect the phone to the same Wi-Fi.</li>}
               <li>Scan the code with the phone camera.</li>
               {lan && secure && <li>The certificate is self-signed, so tap through the warning once.</li>}
-              <li>Point the phone at this screen so all four corner squares are visible.</li>
+              <li>
+                Pick <b>Board and Mochi on this phone</b> to see the whole board big in AR, or{" "}
+                <b>Mochi next to the laptop's board</b> to keep the board here.
+              </li>
+              <li>Point the phone at this screen and keep the squares in view.</li>
             </ol>
             {url && <div className="url">{url}</div>}
+            <p className="room-code">
+              Code <b>{room}</b>
+            </p>
           </div>
         </div>
         {!secure && (

@@ -1,4 +1,4 @@
-import { MARKER_DICTIONARY, registerMarkerDictionary } from "../shared/markers";
+import { CODES, MARKER_DICTIONARY, registerMarkerDictionary } from "../shared/markers";
 import { AR, type ArucoMarker } from "../vendor/aruco/aruco.js";
 import { type BoardLayout, poseFromDetections, type TrackResult } from "./board-pose";
 import DetectWorker from "./detect-worker.ts?worker";
@@ -73,7 +73,7 @@ class Detector {
     if (!ctx) return null;
     ctx.drawImage(video, 0, 0, width, height);
     const t0 = performance.now();
-    const markers = detector.detect(ctx.getImageData(0, 0, width, height)).filter((m) => m.id <= 3);
+    const markers = detector.detect(ctx.getImageData(0, 0, width, height)).filter((m) => m.id < CODES.length);
     return { markers, width, height, ms: performance.now() - t0 };
   }
 

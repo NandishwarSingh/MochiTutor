@@ -1,4 +1,3 @@
-import { motion } from "motion/react";
 import type { LessonState } from "./lesson";
 
 const Icon = {
@@ -10,7 +9,7 @@ const Icon = {
   ),
   phone: (
     <svg viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="7" y="3" width="10" height="18" rx="2" />
+      <rect x="7" y="3" width="10" height="18" rx="1" />
       <path d="M11 18h2" />
     </svg>
   ),
@@ -21,19 +20,6 @@ const Icon = {
   ),
 };
 
-function Meter({ level }: { level: number }) {
-  const v = Math.min(1, level * 9);
-  const bars = [0.55, 0.85, 1, 0.75, 0.5];
-  return (
-    <span className="meter" aria-hidden="true">
-      {bars.map((b, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: fixed bar list
-        <i key={i} style={{ height: `${4 + v * b * 14}px` }} />
-      ))}
-    </span>
-  );
-}
-
 interface Props {
   state: LessonState;
   onStart(): void;
@@ -42,80 +28,78 @@ interface Props {
   onPair(): void;
 }
 
+function statusOf(state: LessonState): { label: string; tone: string } {
+  switch (state.status) {
+    case "connecting":
+      return { label: "Waking Mochi up", tone: "busy" };
+    case "reconnecting":
+      return { label: "Reconnecting", tone: "busy" };
+    case "live":
+      return state.speaking ? { label: "Mochi is talking", tone: "talking" } : { label: "Listening", tone: "live" };
+    case "ended":
+      return { label: "Lesson over", tone: "off" };
+    case "error":
+      return { label: "Stopped", tone: "off" };
+    default:
+      return { label: "Not started", tone: "off" };
+  }
+}
+
+/** The bar along the bottom of the board: what's happening, and the few things you can do. */
 export function Dock({ state, onStart, onStop, onSeeMe, onPair }: Props) {
   const live = state.status === "live" || state.status === "reconnecting";
   const busy = state.status === "connecting" || state.status === "reconnecting";
-  let label = "Ready when you are";
-  let tone = "off";
-  if (state.status === "connecting") [label, tone] = ["Waking Mochi up", "busy"];
-  else if (state.status === "reconnecting") [label, tone] = ["Reconnecting", "busy"];
-  else if (state.status === "live")
-    [label, tone] = state.speaking ? ["Mochi is talking", "talking"] : ["Listening", "live"];
-  else if (state.status === "ended") label = "Lesson ended";
+  const { label, tone } = statusOf(state);
+  const level = state.status === "live" && !state.speaking ? Math.min(1, state.micLevel * 9) : 0;
 
   return (
-    <motion.nav
-      className="dock"
-      aria-label="Lesson controls"
-      initial={{ y: 30, opacity: 0, x: "-50%" }}
-      animate={{ y: 0, opacity: 1, x: "-50%" }}
-      transition={{ type: "spring", stiffness: 420, damping: 32 }}
-    >
-      <div className="dock-status" data-state={tone} aria-live="polite">
-        <span className="dot" />
+    <nav className="bar" aria-label="Lesson controls">
+      <div className="status" data-state={tone} aria-live="polite">
         <span>{label}</span>
-        {state.status === "live" && !state.speaking && <Meter level={state.micLevel} />}
+        <span className="status-level" aria-hidden="true">
+          <i style={{ width: `${state.speaking ? 100 : level * 100}%` }} />
+        </span>
       </div>
       {live || busy ? (
-        <motion.button
-          whileTap={{ scale: 0.96 }}
-          className="btn"
-          onClick={onStop}
-          disabled={state.status === "connecting"}
-        >
+        <button type="button" className="btn" onClick={onStop} disabled={state.status === "connecting"}>
           End lesson
-        </motion.button>
+        </button>
       ) : (
-        <motion.button whileTap={{ scale: 0.96 }} className="btn btn-primary" onClick={onStart}>
+        <button type="button" className="btn btn-primary" onClick={onStart}>
           {state.status === "ended" || state.status === "error" ? "Start again" : "Start lesson"}
-        </motion.button>
+        </button>
       )}
-      <motion.button
-        whileTap={{ scale: 0.92 }}
-        className="btn btn-icon"
-        aria-pressed={state.seeMe}
-        aria-label={state.seeMe ? "Stop letting Mochi see you" : "Let Mochi see you"}
-        title={state.seeMe ? "Mochi can see you" : "Let Mochi see you"}
-        onClick={() => onSeeMe(!state.seeMe)}
-      >
-        {Icon.camera}
-      </motion.button>
-      <motion.button
-        whileTap={{ scale: 0.92 }}
-        className="btn btn-icon"
-        aria-label="Show Mochi on your phone"
-        title={
-          state.viewers > 0
-            ? `Phone connected${state.linkMs !== null ? `, ${state.linkMs} ms` : ""}`
-            : "Show Mochi on your phone"
-        }
-        onClick={onPair}
-      >
-        {Icon.phone}
-        {state.viewers > 0 && <span className="badge" />}
-      </motion.button>
-      <motion.button
-        whileTap={{ scale: 0.92 }}
-        className="btn btn-icon"
-        aria-label="Full screen"
-        title="Full screen"
-        onClick={() => {
-          if (document.fullscreenElement) void document.exitFullscreen();
-          else void document.documentElement.requestFullscreen();
-        }}
-      >
-        {Icon.expand}
-      </motion.button>
-    </motion.nav>
+      <div className="bar-end">
+        <button
+          type="button"
+          className="btn"
+          aria-pressed={state.seeMe}
+          title={state.seeMe ? "Mochi can see you. Press to stop." : "Let Mochi see you through the webcam"}
+          onClick={() => onSeeMe(!state.seeMe)}
+        >
+          {Icon.camera}
+          <span className="label">{state.seeMe ? "She can see you" : "Camera"}</span>
+        </button>
+        <button type="button" className="btn" aria-pressed={state.viewers > 0} onClick={onPair}>
+          {Icon.phone}
+          <span className="label">
+            Phone
+            {state.viewers > 0 && state.linkMs !== null && <span className="ms"> {state.linkMs} ms</span>}
+          </span>
+        </button>
+        <button
+          type="button"
+          className="btn"
+          aria-label="Full screen"
+          onClick={() => {
+            if (document.fullscreenElement) void document.exitFullscreen();
+            else void document.documentElement.requestFullscreen();
+          }}
+        >
+          {Icon.expand}
+          <span className="label">Full screen</span>
+        </button>
+      </div>
+    </nav>
   );
 }

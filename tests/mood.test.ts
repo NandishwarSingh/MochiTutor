@@ -21,7 +21,14 @@ describe("MoodTracker", () => {
     t.push("Shabaash! Bahut ", 0);
     t.push("badhiya kiya.", 10);
     t.push(" Perfect answer.", 2000);
-    expect(seen).toEqual(["excited/cheer", "excited/cheer"]);
+    expect(seen).toEqual(["excited/cheer", "excited/hop"]);
+  });
+
+  test("cute cues: giggles tease, hmph pouts, thanks is shy", () => {
+    expect(moodFromText("Ehehe, pakda gaya!")).toEqual({ emotion: "teasing", gesture: "giggle" });
+    expect(moodFromText("Hmph, phir se try karo")?.emotion).toBe("pout");
+    expect(moodFromText("Aww, thank you!")).toEqual({ emotion: "shy", gesture: "cheeks" });
+    expect(moodFromText("Yayyy, ho gaya!")).toEqual({ emotion: "excited", gesture: "hop" });
   });
 
   test("a mood split across chunks is still caught", () => {

@@ -47,6 +47,44 @@ describe("board tools", () => {
     ]);
   });
 
+  test("write_on_board knows given, answer and note lines", async () => {
+    await call("write_on_board", {
+      lines: [
+        { kind: "given", content: "Two dice" },
+        { kind: "answer", content: "1/6" },
+        { kind: "note", content: "Yaad rakho" },
+      ],
+    });
+    expect(board.snapshot().map((i) => (i.kind === "line" ? i.line : i.kind))).toEqual(["given", "answer", "note"]);
+  });
+
+  test("annotate marks the line it names and focuses it", async () => {
+    await call("write_on_board", {
+      lines: [
+        { kind: "text", content: "Total outcomes:" },
+        { kind: "math", content: "6 \\times 6 = 36" },
+        { kind: "math", content: "P = \\frac{6}{36} = \\frac{1}{6}" },
+      ],
+    });
+    const res = await call("annotate", { line: "6 x 6 = 36", style: "circle", label: "yahi!" });
+    expect(res.response).toEqual({ marked: "6 \\times 6 = 36", style: "circle" });
+    const line = board.snapshot()[1];
+    expect(line.kind === "line" && line.marks?.map((m) => `${m.style}:${m.label}`)).toEqual(["circle:yahi!"]);
+    expect(board.focusSnapshot()).toBe(line.id);
+    // Marking the same line the same way again replaces the mark instead of stacking it.
+    await call("annotate", { line: "6 x 6", style: "circle" });
+    const again = board.snapshot()[1];
+    expect(again.kind === "line" && again.marks?.length).toBe(1);
+  });
+
+  test("annotate explains what's on the board when nothing matches", async () => {
+    await call("write_on_board", { lines: [{ kind: "text", content: "Total outcomes" }] });
+    const res = await call("annotate", { line: "binomial theorem", style: "box" });
+    expect(String(res.response.error)).toContain("Total outcomes");
+    const bad = await call("annotate", { line: "Total", style: "sparkles" });
+    expect(String(bad.response.error)).toContain("style must be one of");
+  });
+
   test("clear_first wipes before writing", async () => {
     await call("write_on_board", { lines: [{ kind: "text", content: "old" }] });
     await call("write_on_board", { clear_first: true, lines: [{ kind: "text", content: "new" }] });

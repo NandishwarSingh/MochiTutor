@@ -6,6 +6,7 @@ import {
   type Session,
 } from "@google/genai";
 import { buildLiveConfig, OPENING_CUE } from "./config";
+import { logEvent } from "./debug";
 
 export type LiveStatus = "idle" | "connecting" | "live" | "reconnecting" | "ended" | "error";
 
@@ -13,7 +14,8 @@ export interface LiveHandlers {
   status(status: LiveStatus, detail?: string): void;
   audio(b64: string): void;
   interrupted(): void;
-  turnComplete(): void;
+  /** `spoke` says whether Mochi said anything in the turn that just ended. */
+  turnComplete(spoke: boolean): void;
   userText(text: string): void;
   mochiText(text: string): void;
   toolCalls(calls: FunctionCall[]): void;
@@ -55,6 +57,9 @@ export class LiveTutor {
   private stopped = false;
   private greeted = false;
   private reconnects = 0;
+  /** Tool results that finished while the connection was being replaced; sent once the new one is up. */
+  private queued: FunctionResponse[] = [];
+  private modelTurnOpen = false;
 
   constructor(private readonly on: LiveHandlers) {}
 
@@ -82,9 +87,11 @@ export class LiveTutor {
           this.handle(m);
         },
         onerror: (e) => {
+          logEvent("error", e.message);
           failed(new Error(e.message || "Connection error"));
         },
         onclose: (e) => {
+          logEvent("close", `${e.code} ${e.reason}`);
           failed(new Error(e.reason || `Connection closed (${e.code})`));
           if (this.session === session) this.session = null;
           if (!this.stopped) void this.recover(e.reason || `closed with code ${e.code}`);
@@ -93,8 +100,14 @@ export class LiveTutor {
     });
     this.session = session;
     await setup;
+    logEvent("setup", this.reconnects ? `after ${this.reconnects} reconnect(s)` : undefined);
     this.reconnects = 0;
     this.on.status("live");
+    if (this.queued.length) {
+      logEvent("tool-response", `${this.queued.length} held over the reconnect`);
+      session.sendToolResponse({ functionResponses: this.queued });
+      this.queued = [];
+    }
     if (!this.greeted) {
       this.greeted = true;
       session.sendClientContent({ turns: [{ role: "user", parts: [{ text: OPENING_CUE }] }], turnComplete: true });
@@ -108,6 +121,7 @@ export class LiveTutor {
       return;
     }
     this.reconnects++;
+    logEvent("reconnect", reason);
     this.on.status("reconnecting");
     try {
       await this.connect();
@@ -121,22 +135,42 @@ export class LiveTutor {
       this.resumeHandle = m.sessionResumptionUpdate.newHandle;
     }
     if (m.goAway && this.session) {
+      logEvent("go-away", m.goAway.timeLeft);
       // The server is about to close this connection; move to a fresh one now.
       const old = this.session;
       this.session = null;
       old.close();
     }
-    if (m.toolCall?.functionCalls?.length) this.on.toolCalls(m.toolCall.functionCalls);
-    if (m.toolCallCancellation?.ids?.length) this.on.toolCancel(m.toolCallCancellation.ids);
+    if (m.toolCall?.functionCalls?.length) {
+      logEvent("tool-call", m.toolCall.functionCalls.map((c) => c.name).join(", "));
+      this.on.toolCalls(m.toolCall.functionCalls);
+    }
+    if (m.toolCallCancellation?.ids?.length) {
+      logEvent("tool-cancel", m.toolCallCancellation.ids.join(", "));
+      this.on.toolCancel(m.toolCallCancellation.ids);
+    }
     const sc = m.serverContent;
     if (!sc) return;
-    if (sc.interrupted) this.on.interrupted();
+    if (sc.interrupted) {
+      logEvent("interrupted");
+      this.modelTurnOpen = false;
+      this.on.interrupted();
+    }
     for (const part of sc.modelTurn?.parts ?? []) {
-      if (part.inlineData?.data && part.inlineData.mimeType?.startsWith("audio/")) this.on.audio(part.inlineData.data);
+      if (part.inlineData?.data && part.inlineData.mimeType?.startsWith("audio/")) {
+        if (!this.modelTurnOpen) logEvent("speaking");
+        this.modelTurnOpen = true;
+        this.on.audio(part.inlineData.data);
+      }
     }
     if (sc.inputTranscription?.text) this.on.userText(sc.inputTranscription.text);
     if (sc.outputTranscription?.text) this.on.mochiText(sc.outputTranscription.text);
-    if (sc.turnComplete) this.on.turnComplete();
+    if (sc.turnComplete) {
+      const spoke = this.modelTurnOpen;
+      logEvent("turn-complete", spoke ? undefined : "without speaking");
+      this.modelTurnOpen = false;
+      this.on.turnComplete(spoke);
+    }
   }
 
   sendAudio(pcm: Int16Array): void {
@@ -148,7 +182,31 @@ export class LiveTutor {
   }
 
   respond(responses: FunctionResponse[]): void {
-    if (responses.length) this.session?.sendToolResponse({ functionResponses: responses });
+    if (!responses.length) return;
+    if (!this.session) {
+      // Mid-reconnect: Gemini is still waiting for these, so they go out on the new connection.
+      this.queued.push(...responses);
+      return;
+    }
+    logEvent("tool-response", responses.map((r) => r.name).join(", "));
+    this.session.sendToolResponse({ functionResponses: responses });
+  }
+
+  /**
+   * Tell Gemini the student's audio has stopped, so it ends their turn now.
+   * Room noise can keep its own voice detection waiting for silence that never comes.
+   */
+  endUserTurn(): void {
+    if (!this.session) return;
+    logEvent("end-user-turn");
+    this.session.sendRealtimeInput({ audioStreamEnd: true });
+  }
+
+  /** A quiet note to Gemini, for when it went silent without answering. */
+  nudge(note: string): void {
+    if (!this.session) return;
+    logEvent("nudge", note);
+    this.session.sendClientContent({ turns: [{ role: "user", parts: [{ text: note }] }], turnComplete: true });
   }
 
   get connected(): boolean {

@@ -1,5 +1,5 @@
 // Marker detection off the main thread so the phone keeps rendering at full speed.
-import { MARKER_DICTIONARY, registerMarkerDictionary } from "../shared/markers";
+import { CODES, MARKER_DICTIONARY, registerMarkerDictionary } from "../shared/markers";
 import { AR } from "../vendor/aruco/aruco.js";
 
 registerMarkerDictionary(AR);
@@ -20,7 +20,7 @@ self.onmessage = (e: MessageEvent<{ bitmap: ImageBitmap }>) => {
   const t0 = performance.now();
   const markers = detector
     .detect(ctx.getImageData(0, 0, width, height))
-    .filter((m) => m.id <= 3)
+    .filter((m) => m.id < CODES.length)
     .map((m) => ({
       id: m.id,
       hammingDistance: m.hammingDistance,

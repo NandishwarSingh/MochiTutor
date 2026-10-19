@@ -8,6 +8,36 @@ export function ensureShadow(root: THREE.Object3D, radius: number): void {
   root.add(contactShadow(radius));
 }
 
+/** Height of the little wooden stage Mochi stands on, in metres. */
+export const STAGE_HEIGHT = 0.06;
+
+/**
+ * A low round wooden stage, top at y = STAGE_HEIGHT, with its own shadow on
+ * the floor or desk. Mochi stands on it so her feet always meet something solid.
+ */
+export function createStage(radius = 0.4): THREE.Group {
+  const stage = new THREE.Group();
+  const side = new THREE.MeshStandardMaterial({ color: 0x6e4b33, roughness: 0.85 });
+  const top = new THREE.MeshStandardMaterial({ color: 0x9a6c48, roughness: 0.75 });
+  const rim = new THREE.MeshStandardMaterial({ color: 0xb98a5e, roughness: 0.7 });
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, radius * 1.04, STAGE_HEIGHT - 0.008, 48, 1, true),
+    side,
+  );
+  body.position.y = (STAGE_HEIGHT - 0.008) / 2;
+  const cap = new THREE.Mesh(new THREE.CircleGeometry(radius - 0.012, 48), top);
+  cap.rotation.x = -Math.PI / 2;
+  cap.position.y = STAGE_HEIGHT;
+  // A rounded lip where the top meets the side, so the edge catches the light.
+  const lip = new THREE.Mesh(new THREE.TorusGeometry(radius - 0.006, 0.008, 8, 64), rim);
+  lip.rotation.x = Math.PI / 2;
+  lip.position.y = STAGE_HEIGHT - 0.006;
+  const floorShadow = contactShadow(radius * 1.35);
+  floorShadow.position.y = 0.001;
+  stage.add(floorShadow, body, cap, lip);
+  return stage;
+}
+
 function contactShadow(radius: number): THREE.Mesh {
   const size = 128;
   const canvas = document.createElement("canvas");
@@ -77,6 +107,7 @@ export class AvatarStage {
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = createRenderer(canvas);
     addLights(this.scene);
+    this.scene.add(createStage());
     this.resize = new ResizeObserver(() => this.fit());
     this.resize.observe(canvas);
     this.fit();
@@ -85,17 +116,43 @@ export class AvatarStage {
   setAvatar(avatar: MochiAvatar, turn = -0.3): void {
     if (this.avatar) this.scene.remove(this.avatar.root);
     this.avatar = avatar;
-    avatar.root.position.set(0, 0, 0);
+    avatar.root.position.set(0, STAGE_HEIGHT, 0);
     avatar.root.rotation.set(0, turn, 0);
     avatar.root.scale.setScalar(1);
-    ensureShadow(avatar.root, 0.34);
+    ensureShadow(avatar.root, 0.3);
     avatar.setStudent(this.camera);
     this.scene.add(avatar.root);
-    const h = avatar.height;
-    // Leave headroom for a raised hand when Mochi waves or cheers.
-    const dist = (h * 0.72) / Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
-    this.camera.position.set(0, h * 0.6, dist);
-    this.camera.lookAt(0, h * 0.56, 0);
+    this.frame();
+  }
+
+  /** Back the camera off until Mochi and her stage fit, raised hands included, in a tall or a narrow canvas. */
+  private frame(): void {
+    if (!this.avatar) return;
+    const h = this.avatar.height + STAGE_HEIGHT;
+    const tan = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    // Headroom for a hand raised in a wave or a cheer, and room for one held out to the side.
+    const dist = Math.max((h * 0.72) / tan, (h * 0.3) / (tan * this.camera.aspect));
+    this.camera.position.set(0, h * 0.58, dist);
+    this.camera.lookAt(0, h * 0.54, 0);
+  }
+
+  private readonly ray = new THREE.Raycaster();
+  private readonly ndc = new THREE.Vector2();
+  private readonly plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -0.3);
+
+  /**
+   * Point at something on the page outside this canvas, like a board line to
+   * Mochi's right: the screen point is cast into her world and she points at
+   * where it lands, a little in front of her.
+   */
+  pointAtScreen(clientX: number, clientY: number, seconds?: number): void {
+    if (!this.avatar) return;
+    const r = this.canvas.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    this.ndc.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+    this.ray.setFromCamera(this.ndc, this.camera);
+    const hit = this.ray.ray.intersectPlane(this.plane, new THREE.Vector3());
+    if (hit) this.avatar.pointAt(hit, seconds);
   }
 
   private fit(): void {
@@ -104,6 +161,7 @@ export class AvatarStage {
     fitRenderer(this.renderer, this.canvas);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    this.frame();
   }
 
   start(): void {

@@ -4,6 +4,7 @@ import { join, normalize, resolve } from "node:path";
 import type { Server, ServerWebSocket } from "bun";
 import { ROOM_CODE, type Role } from "../src/shared/protocol";
 import type { Box, SessionGrant } from "./gemini";
+import type { ImageSearch } from "./images";
 import { clientAddress, matchesAny } from "./net";
 import { DailyCap, RateLimiter } from "./rate-limit";
 import { Rooms } from "./rooms";
@@ -21,6 +22,10 @@ export interface AppOptions {
   dailySessionLimit?: number;
   /** Notebook lookups everyone together may make per UTC day; 0 means no cap. */
   dailyLocateLimit?: number;
+  /** Finds free pictures for the board; null turns pictures off. */
+  images?: ImageSearch | null;
+  /** Picture searches everyone together may make per UTC day; 0 means no cap. */
+  dailyImageLimit?: number;
   /** Proxies allowed to set X-Forwarded-For and X-Forwarded-Host: addresses or IPv4 CIDRs. */
   trustedProxies?: string[];
   /** Serve /api/network so the board can put the laptop's LAN address in the QR code. Dev only. */
@@ -34,7 +39,14 @@ export interface AppOptions {
 interface SocketData {
   code: string;
   role: Role;
+  /** bytes relayed in the current window, so one peer can't flood its room */
+  bytes: number;
+  windowAt: number;
 }
+
+/** What one socket may relay per window: plenty for board snapshots and a few notebook photos. */
+const SOCKET_BYTES = 4_000_000;
+const SOCKET_WINDOW_MS = 10_000;
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 
@@ -100,6 +112,9 @@ export function startApp(opts: AppOptions): Server<SocketData> {
   const locateLimiter = new RateLimiter(40, 10 * 60_000);
   const dailySessions = new DailyCap(opts.dailySessionLimit ?? 0);
   const dailyLocates = new DailyCap(opts.dailyLocateLimit ?? 0);
+  const imageLimiter = new RateLimiter(60, 10 * 60_000);
+  const imageFileLimiter = new RateLimiter(300, 10 * 60_000);
+  const dailyImages = new DailyCap(opts.dailyImageLimit ?? 0);
   const trusted = opts.trustedProxies ?? LOOPBACK;
   const maxSockets = opts.maxSockets ?? 200;
   let sockets = 0;
@@ -166,6 +181,38 @@ export function startApp(opts: AppOptions): Server<SocketData> {
           }
         },
       },
+      "/api/images/search": {
+        GET: async (req: Request, server: Server<SocketData>) => {
+          if (!sameOrigin(req, server)) return json({ error: "Cross-site requests are not allowed." }, 403);
+          if (!opts.images) return json({ error: "Pictures are turned off on this server." }, 503);
+          const wait = imageLimiter.take(caller(req, server));
+          if (wait > 0) return tooMany("Too many picture searches.", wait);
+          const query = new URL(req.url).searchParams.get("q")?.trim() ?? "";
+          if (!query || query.length > 120) return json({ error: "Send a short search as q." }, 400);
+          const tomorrow = dailyImages.take();
+          if (tomorrow > 0) return tooMany("The demo's picture searches are used up for today.", tomorrow);
+          try {
+            return json({ image: await opts.images.search(query, AbortSignal.timeout(6000)) });
+          } catch (err) {
+            console.error("image search failed:", err instanceof Error ? err.message : err);
+            return json({ error: "Couldn't search for a picture." }, 502);
+          }
+        },
+      },
+      "/api/images/:id": {
+        GET: async (req: Bun.BunRequest<"/api/images/:id">, server: Server<SocketData>) => {
+          if (!opts.images) return json({ error: "Pictures are turned off on this server." }, 503);
+          if (!/^[0-9a-f]{20}$/.test(req.params.id)) return json({ error: "Not found." }, 404);
+          const wait = imageFileLimiter.take(caller(req, server));
+          if (wait > 0) return tooMany("Too many pictures.", wait);
+          try {
+            return (await opts.images.file(req.params.id)) ?? json({ error: "Not found." }, 404);
+          } catch (err) {
+            console.error("image fetch failed:", err instanceof Error ? err.message : err);
+            return json({ error: "That picture couldn't be loaded." }, 502);
+          }
+        },
+      },
       "/api/notebook/locate": {
         POST: async (req: Request, server: Server<SocketData>) => {
           if (!sameOrigin(req, server)) return json({ error: "Cross-site requests are not allowed." }, 403);
@@ -205,7 +252,7 @@ export function startApp(opts: AppOptions): Server<SocketData> {
         }
         if (!sameOrigin(req, server)) return json({ error: "Cross-site requests are not allowed." }, 403);
         if (sockets >= maxSockets) return json({ error: "The server is busy. Try again in a minute." }, 503);
-        if (server.upgrade(req, { data: { code, role } })) return undefined;
+        if (server.upgrade(req, { data: { code, role, bytes: 0, windowAt: Date.now() } })) return undefined;
         return json({ error: "Expected a WebSocket upgrade." }, 426);
       }
       if (opts.staticDir && (req.method === "GET" || req.method === "HEAD")) {
@@ -215,14 +262,23 @@ export function startApp(opts: AppOptions): Server<SocketData> {
       return json({ error: "Not found." }, 404);
     },
     websocket: {
-      maxPayloadLength: 4096,
+      // Board snapshots and notebook photos for phone mode; everything else is far smaller.
+      maxPayloadLength: 512 * 1024,
       idleTimeout: 120,
       open(ws) {
         sockets++;
         if (!rooms.join(ws.data.code, ws.data.role, ws)) ws.close(1008, "Room is full");
       },
       message(ws, message) {
-        if (typeof message === "string") rooms.relay(ws.data.code, ws.data.role, message);
+        if (typeof message !== "string") return;
+        const now = Date.now();
+        if (now - ws.data.windowAt > SOCKET_WINDOW_MS) {
+          ws.data.windowAt = now;
+          ws.data.bytes = 0;
+        }
+        ws.data.bytes += message.length;
+        if (ws.data.bytes > SOCKET_BYTES) return;
+        rooms.relay(ws.data.code, ws.data.role, message);
       },
       close(ws) {
         sockets--;

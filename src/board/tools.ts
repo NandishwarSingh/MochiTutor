@@ -5,7 +5,9 @@ import { type Door, decide, flipCoins, newMontyGame, pickDoor, simulateMonty } f
 import { type DistributionFamily, type DistributionParams, makeDistribution, probabilityBetween } from "../lib/stats";
 import type { Emotion, Gesture } from "../shared/protocol";
 import { stripEmoji } from "../shared/text";
-import type { BoardStore, LineKind, NotebookMark } from "./store";
+import { findLine } from "./follow";
+import { type BoardStore, LINE_KINDS, type LineKind, MARK_STYLES, type MarkStyle, type NotebookMark } from "./store";
+import { barChart, drawDiagram, numberLine, probabilityTree, showImage, vennDiagram } from "./visual-tools";
 
 export interface Photo {
   dataUrl: string;
@@ -21,6 +23,8 @@ export interface ToolContext {
   locate?(imageBase64: string, target: string): Promise<[number, number, number, number] | null>;
   /** Called for every board change so Mochi can glance and point at it. */
   onBoardChange(): void;
+  /** A free picture for a search, or null. */
+  findImage?(query: string, signal: AbortSignal): Promise<{ id: string; title: string; credit: string } | null>;
   /** Clock in ms, injectable for tests. */
   now?(): number;
 }
@@ -45,11 +49,9 @@ const handlers: Record<string, (args: Args, ctx: ToolContext, signal: AbortSigna
     const lines = Array.isArray(args.lines) ? args.lines : [];
     if (args.clear_first === true) board.clear();
     let written = 0;
-    for (const raw of lines.slice(0, 12)) {
+    for (const raw of lines.slice(0, 16)) {
       const line = raw as { kind?: unknown; content?: unknown };
-      const kind = (["title", "text", "math", "step"] as const).includes(line.kind as LineKind)
-        ? (line.kind as LineKind)
-        : "text";
+      const kind = LINE_KINDS.includes(line.kind as LineKind) ? (line.kind as LineKind) : "text";
       const content = str(line.content);
       if (content) {
         board.add({ kind: "line", line: kind, content: content.slice(0, 400) });
@@ -59,6 +61,32 @@ const handlers: Record<string, (args: Args, ctx: ToolContext, signal: AbortSigna
     onBoardChange();
     return { response: { written } };
   },
+
+  annotate(args, { board, onBoardChange }) {
+    const style = str(args.style) as MarkStyle;
+    if (!MARK_STYLES.includes(style)) throw new Error(`style must be one of ${MARK_STYLES.join(", ")}`);
+    const lines = board
+      .snapshot()
+      .filter((it) => it.kind === "line")
+      .map((it) => ({ id: it.id, content: it.content }));
+    if (!lines.length) throw new Error("The board has no lines to mark yet.");
+    const target = findLine(lines, str(args.line));
+    if (!target) {
+      const recent = lines.slice(-8).map((l) => l.content);
+      throw new Error(`No line matches "${str(args.line)}". Lines on the board: ${JSON.stringify(recent)}`);
+    }
+    board.mark(target.id, style, str(args.label).slice(0, 40) || undefined);
+    board.focus(target.id);
+    onBoardChange();
+    return { response: { marked: target.content, style } };
+  },
+
+  draw_diagram: drawDiagram,
+  probability_tree: probabilityTree,
+  number_line: numberLine,
+  venn_diagram: vennDiagram,
+  bar_chart: barChart,
+  show_image: showImage,
 
   clear_board(_args, { board }) {
     board.clear();

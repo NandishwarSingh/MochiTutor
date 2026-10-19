@@ -1,12 +1,15 @@
 :root {
-  --board: #1c2520;
-  --chalk: #ece7da;
-  --chalk-soft: rgba(236, 231, 218, 0.62);
+  --board: #1d2621;
+  --board-deep: #131a16;
+  --chalk: #ece8dc;
+  --chalk-soft: rgba(236, 232, 220, 0.66);
+  --rule: rgba(236, 232, 220, 0.12);
+  --rule-strong: rgba(236, 232, 220, 0.26);
   --yellow: #f2cf6a;
   --green: #a9d49a;
   --danger: #f08a80;
-  --ui: "Baloo 2", system-ui, sans-serif;
-  --hand: "Kalam", "Baloo 2", cursive;
+  --ui: "Atkinson Hyperlegible Next", system-ui, sans-serif;
+  --hand: "Kalam", cursive;
   color-scheme: dark;
 }
 
@@ -35,6 +38,11 @@ button {
   color: inherit;
 }
 
+:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 2px;
+}
+
 .viewer {
   position: fixed;
   inset: 0;
@@ -57,157 +65,126 @@ button {
   height: 100%;
 }
 
+/* ---- first screen: written like the board ------------------------- */
+
 .intro {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-content: center;
-  text-align: center;
-  padding: 24px 16px;
+  padding: max(40px, env(safe-area-inset-top)) 22px max(28px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
 }
 
 .intro h1 {
   font-family: var(--hand);
   font-weight: 700;
-  font-size: clamp(60px, 18vw, 110px);
-  line-height: 1;
+  font-size: 44px;
+  line-height: 1.1;
+  color: var(--yellow);
   margin: 0;
+  padding-bottom: 4px;
+  width: fit-content;
+  border-bottom: 2px solid rgba(242, 207, 106, 0.5);
 }
 
 .intro p {
-  font-family: var(--hand);
-  font-size: 20px;
-  color: var(--chalk-soft);
-  margin: 12px auto 0;
-  max-width: 28ch;
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--chalk);
+  margin: 18px 0 0;
+  max-width: 34ch;
 }
 
 .intro .hint {
-  font-family: var(--ui);
   font-size: 15px;
+  color: var(--chalk-soft);
+  margin-top: 14px;
 }
 
 .intro .error {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--ui);
   font-size: 16px;
-  color: var(--chalk);
-  background: rgba(240, 138, 128, 0.14);
-  padding: 6px 12px;
-  border-radius: 8px;
+  padding: 8px 12px;
+  background: #2b1816;
+  border: 1px solid rgba(240, 138, 128, 0.45);
+  color: #f6d2cd;
 }
 
 .intro-actions {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 10px;
-  margin: 26px auto 0;
-  width: min(300px, 100%);
-}
-
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex: none;
-  background: currentColor;
-  color: var(--chalk-soft);
-}
-
-.dot[data-on="true"] {
-  color: var(--green);
-}
-
-.intro .error .dot {
-  color: var(--danger);
+  margin-top: auto;
 }
 
 .btn {
-  height: 46px;
-  border: 0;
-  border-radius: 999px;
-  padding: 0 20px;
+  height: 48px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  padding: 0 18px;
   white-space: nowrap;
   font-weight: 600;
-  font-size: 16px;
+  font-size: 17px;
   cursor: pointer;
-  background: rgba(255, 255, 255, 0.1);
+  background: transparent;
 }
 
 .btn-primary {
   background: var(--chalk);
-  color: #18201b;
+  border-color: var(--chalk);
+  color: var(--board-deep);
 }
 
-.glass,
-.pill,
-.bar {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04) 46%, rgba(255, 255, 255, 0.08)),
-    rgba(20, 26, 23, 0.35);
-  backdrop-filter: blur(3px) saturate(170%) brightness(1.06);
-  -webkit-backdrop-filter: blur(3px) saturate(170%) brightness(1.06);
-  box-shadow:
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.55),
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.28),
-    0 8px 24px rgba(0, 0, 0, 0.3);
-}
+/* ---- over the camera ---------------------------------------------- */
 
-.pill {
+.status-chip {
   position: absolute;
-  top: max(16px, env(safe-area-inset-top));
-  left: 16px;
-  right: 16px;
-  margin: 0 auto;
-  width: fit-content;
-  max-width: calc(100% - 32px);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border-radius: 999px;
+  top: max(14px, env(safe-area-inset-top));
+  left: 14px;
+  max-width: calc(100% - 28px);
+  padding: 7px 11px;
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 600;
+  background: rgba(19, 26, 22, 0.9);
+}
+
+.status-chip[data-ok="true"] {
+  color: var(--green);
 }
 
 .bar {
   position: absolute;
-  bottom: max(18px, env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
-  gap: 6px;
-  padding: 6px;
-  border-radius: 999px;
+  gap: 8px;
+  padding: 10px 14px max(10px, env(safe-area-inset-bottom));
+  background: rgba(19, 26, 22, 0.94);
+  border-top: 1px solid var(--rule);
 }
 
 .bar .btn {
-  height: 42px;
-  background: rgba(255, 255, 255, 0.08);
+  flex: 1;
+  height: 44px;
 }
 
 .adjust {
   position: absolute;
-  left: 16px;
-  right: 16px;
-  bottom: calc(max(18px, env(safe-area-inset-bottom)) + 66px);
-  margin: 0 auto;
-  max-width: 420px;
+  left: 0;
+  right: 0;
+  bottom: calc(max(10px, env(safe-area-inset-bottom)) + 64px);
   padding: 14px 16px;
-  border-radius: 14px;
-  background: rgba(20, 26, 23, 0.86);
+  background: rgba(19, 26, 22, 0.96);
+  border-top: 1px solid var(--rule);
   display: grid;
   gap: 10px;
 }
 
 .adjust label {
   display: grid;
-  grid-template-columns: 130px 1fr;
+  grid-template-columns: 140px 1fr;
   align-items: center;
   gap: 10px;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--chalk-soft);
 }
 
@@ -217,6 +194,177 @@ button {
 }
 
 .adjust .btn {
-  height: 38px;
+  height: 40px;
   justify-self: end;
+}
+
+/* ---- phone mode: the board drawn in AR ----------------------------- */
+
+.ar-board-view {
+  position: absolute;
+  pointer-events: none;
+}
+
+.ar-board {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+  background: var(--board);
+  border: 18px solid #6e4b33;
+  border-bottom-width: 26px;
+  padding: 34px 44px 30px;
+  overflow: hidden;
+  color: var(--chalk);
+}
+
+.captions-hud {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: calc(max(10px, env(safe-area-inset-bottom)) + 74px);
+  pointer-events: none;
+}
+
+.captions-hud .you {
+  font-size: 13px;
+  color: var(--chalk-soft);
+  margin-bottom: 6px;
+}
+
+.captions-hud .mochi {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.captions-hud .mochi span {
+  background: rgba(12, 16, 14, 0.9);
+  padding: 3px 8px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* ---- headset ------------------------------------------------------------ */
+
+.viewer[data-mode="vr"] {
+  background: #000;
+}
+
+.vr-eye {
+  position: absolute;
+  top: 0;
+  overflow: hidden;
+}
+
+.vr-eye .camera {
+  position: absolute;
+}
+
+.vr-caption {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: 14%;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.vr-eye .vr-caption span {
+  background: rgba(12, 16, 14, 0.9);
+  padding: 2px 6px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.vr-tap {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.vr-turn {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+  background: rgba(19, 26, 22, 0.94);
+  pointer-events: none;
+}
+
+.vr-menu {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(460px, calc(100% - 32px));
+  padding: 16px;
+  background: rgba(19, 26, 22, 0.97);
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+}
+
+.vr-menu p {
+  margin: 0 0 10px;
+  font-size: 15px;
+  color: var(--chalk-soft);
+}
+
+.vr-menu-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.vr-menu-actions .btn {
+  flex: 1;
+  height: 42px;
+}
+
+.adjust.adjust-inline {
+  position: static;
+  padding: 0;
+  background: none;
+  border: 0;
+  margin-top: 16px;
+}
+
+.intro .steps {
+  margin: 14px 0 0;
+  padding-left: 20px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--chalk-soft);
+}
+
+.room-entry {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.room-entry input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 12px;
+  font-size: 17px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  color: var(--chalk);
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+}
+
+.room-entry .btn {
+  height: 44px;
 }

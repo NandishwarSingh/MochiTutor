@@ -26,6 +26,7 @@ export function MochiPip({ lesson, phone }: { lesson: Lesson; phone: boolean }) 
   useEffect(() => {
     if (!canvas.current) return;
     const stage = new AvatarStage(canvas.current);
+    lesson.attachStage(stage);
     stage.onFrame = (dt) => lesson.tick(dt);
     stage.start();
     let cancelled = false;
@@ -41,6 +42,7 @@ export function MochiPip({ lesson, phone }: { lesson: Lesson; phone: boolean }) 
       .catch(() => setNote("No avatar found. Run bun run setup to download the sample model."));
     return () => {
       cancelled = true;
+      lesson.attachStage(null);
       stage.dispose();
     };
   }, [lesson]);

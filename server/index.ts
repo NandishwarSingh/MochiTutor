@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { startApp } from "./app";
 import { config } from "./config";
 import { createSessionGrant, locateInImage } from "./gemini";
+import { ImageSearch } from "./images";
 
 const distDir = config.staticDir ?? resolve(import.meta.dir, "../dist");
 const tls = config.tlsCert && config.tlsKey ? { cert: config.tlsCert, key: config.tlsKey } : undefined;
@@ -24,6 +25,8 @@ const server = startApp({
   sessionWindowMs: config.sessionWindowMs,
   dailySessionLimit: config.dailySessionLimit,
   dailyLocateLimit: config.dailyLocateLimit,
+  images: new ImageSearch(),
+  dailyImageLimit: config.dailyImageLimit,
   trustedProxies: config.trustedProxies,
   exposeNetwork: !config.production,
   staticDir: config.production && existsSync(distDir) ? distDir : undefined,

@@ -32,6 +32,8 @@ export const config = {
   /** Live sessions everyone together may start per UTC day (0 = no cap), for a public demo */
   dailySessionLimit: int("DAILY_SESSION_LIMIT", 0),
   dailyLocateLimit: int("DAILY_LOCATE_LIMIT", 0),
+  /** Picture searches everyone together may make per UTC day; 0 means no cap */
+  dailyImageLimit: int("DAILY_IMAGE_LIMIT", 0),
   /** Proxies whose X-Forwarded-For is believed, as addresses or IPv4 CIDRs */
   trustedProxies: list("TRUSTED_PROXIES", ["127.0.0.1", "::1"]),
   /** Built files to serve in production; defaults to ./dist next to the server */

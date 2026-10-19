@@ -6,7 +6,8 @@ import { Dock } from "./Dock";
 import type { Lesson } from "./lesson";
 import { Markers } from "./Markers";
 import { MochiPip } from "./MochiPip";
-import { Captions, CaptureOverlay, Intro, PairSheet } from "./Overlays";
+import { Captions, CaptureOverlay, Intro, PairSheet, PrivacyNote } from "./Overlays";
+import { PhoneMode } from "./PhoneMode";
 import { useBoardItems } from "./store";
 
 export function App({ lesson }: { lesson: Lesson }) {
@@ -19,11 +20,29 @@ export function App({ lesson }: { lesson: Lesson }) {
     [lesson],
   );
 
+  if (state.phoneBoard) {
+    return (
+      <>
+        <PhoneMode lesson={lesson} state={state} />
+        <AnimatePresence>
+          {state.countdown !== null && <CaptureOverlay key="cap" video={lesson.camera.video} count={state.countdown} />}
+        </AnimatePresence>
+        {/* Mochi's stage keeps running out of sight: it drives her lip sync for the phone. */}
+        <div className="offstage" aria-hidden="true">
+          <MochiPip lesson={lesson} phone />
+        </div>
+      </>
+    );
+  }
+
   return (
     <div className="app" data-phone={phone}>
       <main className="board">
         <Board store={lesson.board} />
-        <AnimatePresence>{items.length === 0 && state.status !== "live" && <Intro />}</AnimatePresence>
+        <AnimatePresence>
+          {items.length === 0 && state.status !== "live" && <Intro key="intro" />}
+          {items.length === 0 && state.status === "idle" && <PrivacyNote key="note" />}
+        </AnimatePresence>
       </main>
       <MochiPip lesson={lesson} phone={phone} />
       {(phone || pairing) && <Markers onLayout={onLayout} />}
